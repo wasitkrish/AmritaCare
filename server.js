@@ -6,7 +6,6 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import OpenAI from "openai";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -28,56 +27,55 @@ app.get("/api/health", (req, res) => {
 });
 
 /**
- * GPT Chat API - OpenAI Integration
- * POST /api/chat
- * Body: { message: string }
+ * GPT Chat API - Store & Retrieve User Messages (Real-time user-to-user)
+ * POST /api/messages - Save a message
+ * GET /api/messages - Get all messages
  */
-app.post("/api/chat", async (req, res) => {
-  const { message } = req.body;
+app.post("/api/messages", (req, res) => {
+  const { from, email, text, timestamp } = req.body;
 
-  if (!message) {
-    return res.status(400).json({ error: "No message provided." });
-  }
-
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    return res.status(500).json({ 
-      error: "Server configuration error: OPENAI_API_KEY not set." 
-    });
+  if (!from || !email || !text) {
+    return res.status(400).json({ error: "Missing required fields: from, email, text" });
   }
 
   try {
-    const client = new OpenAI({ apiKey: key });
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are a supportive assistant helping students with mental health topics. 
-                    Give empathetic, concise, and safe guidance. 
-                    Important: If the user mentions self-harm or suicide, immediately suggest professional help:
-                    - National Suicide Prevention Lifeline: 988 (US)
-                    - Crisis Text Line: Text HOME to 741741
-                    - International Association for Suicide Prevention: https://www.iasp.info/resources/Crisis_Centres/`,
-        },
-        {
-          role: "user",
-          content: message,
-        },
-      ],
-      max_tokens: 500,
-      temperature: 0.7,
+    // Store message (in production, use a real database)
+    const messages = JSON.parse(process.env.CHAT_MESSAGES || "[]");
+    messages.push({
+      from,
+      email,
+      text,
+      timestamp: timestamp || Date.now(),
+      ts: new Date().toLocaleTimeString(),
+      id: Date.now()
     });
+    
+    // Keep last 500 messages in memory
+    if (messages.length > 500) messages.shift();
+    process.env.CHAT_MESSAGES = JSON.stringify(messages);
 
-    const reply = completion.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response. Please try again.";
-    res.json({ success: true, reply });
-  } catch (err) {
-    console.error("❌ OpenAI error:", err);
-    res.status(500).json({ 
-      success: false,
-      error: "Chat service error. Please try again later.",
-      detail: process.env.NODE_ENV === "development" ? err.message : undefined
+    res.json({ 
+      success: true, 
+      message: "Message saved",
+      id: Date.now()
     });
+  } catch (err) {
+    console.error("❌ Error saving message:", err);
+    res.status(500).json({ error: "Failed to save message" });
+  }
+});
+
+/**
+ * Retrieve all chat messages
+ * GET /api/messages
+ */
+app.get("/api/messages", (req, res) => {
+  try {
+    const messages = JSON.parse(process.env.CHAT_MESSAGES || "[]");
+    res.json({ success: true, messages, count: messages.length });
+  } catch (err) {
+    console.error("❌ Error retrieving messages:", err);
+    res.json({ success: true, messages: [], count: 0 });
   }
 });
 

@@ -501,12 +501,12 @@ input.form-input {
       <div id="chatCard" class="card p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex flex-col">
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">Realtime Chat</h3>
-            <p class="text-sm muted">Login to send messages.</p>
+            <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">💬 Community Chat</h3>
+            <p class="text-sm muted">Connect with other students - login to join the conversation.</p>
           </div>
           <div class="flex items-center gap-2">
             <button id="clearChatBtn" class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Clear</button>
-            <div class="text-sm muted">Live</div>
+            <div class="text-sm muted">🟢 Live</div>
           </div>
         </div>
 
@@ -1426,31 +1426,14 @@ function sendChatMessage(){
     email: user.email,
     text: txt,
     ts: new Date().toLocaleTimeString(),
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    isUser: true
   };
   
   saveChatMessage(msg);
   messageInput.value = '';
   
-  // Simulate receiving a response (optional - can be removed)
-  setTimeout(() => {
-    if(Math.random() > 0.7){ // 30% chance of auto-response
-      const responses = [
-        'Thank you for sharing!',
-        'We appreciate your message.',
-        'Your message has been received.',
-        'Thank you for reaching out!'
-      ];
-      const autoMsg = {
-        from: 'Support Team',
-        email: 'support@bl.students.amrita.edu',
-        text: responses[Math.floor(Math.random() * responses.length)],
-        ts: new Date().toLocaleTimeString(),
-        timestamp: Date.now()
-      };
-      saveChatMessage(autoMsg);
-    }
-  }, 1000);
+  // Real-time user-to-user chat - no AI responses needed!
 }
 
 /* small escape util */
