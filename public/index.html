@@ -1,0 +1,1615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mental Health — Fixed</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' }</script>
+<style>
+  :root{
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --muted: #6b7280;
+    --text: #0f172a;
+    --accent-1:#6366f1;
+    --accent-2:#8b5cf6;
+    --arrow:#111827;
+    --dot-active:#111827;
+    --dot-inactive:rgba(255,255,255,0.45);
+    --glow-light: rgba(99,102,241,0.10);
+    --glow-strong: rgba(139,92,246,0.08);
+  }
+  .dark{
+    --bg:#071428;
+    --card-bg:#0b1b2a;
+    --muted:#9ca3af;
+    --text:#e6eef7;
+    --arrow:#e6eef7;
+    --dot-active:#e6eef7;
+    --dot-inactive:rgba(255,255,255,0.2);
+    --glow-light: rgba(99,102,241,0.06);
+    --glow-strong: rgba(139,92,246,0.16);
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial;}
+  body{background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;}
+  .muted{ color:var(--muted); }
+
+  /* --- Cards: subtle purple glow while preserving original shadows --- */
+  .card{
+    background:var(--card-bg);
+    border-radius:14px;
+    /* original soft shadow + subtle purple ambient glow */
+    box-shadow:
+      0 8px 30px rgba(2,6,23,0.06),
+      0 8px 30px var(--glow-light),
+      0 0 20px var(--glow-strong);
+    transition: box-shadow .22s ease, transform .12s ease;
+  }
+  .card:hover{
+    transform: translateY(-4px);
+    box-shadow:
+      0 12px 36px rgba(2,6,23,0.08),
+      0 14px 40px var(--glow-light),
+      0 0 28px var(--glow-strong);
+  }
+
+  .form-input{ width:100%; padding:.6rem .75rem; border-radius:8px; border:1px solid rgba(2,6,23,0.06); background:transparent; color:inherit; }
+  .form-input::placeholder{ color:var(--muted); }
+  .form-input:focus{ outline:none; box-shadow:0 8px 30px rgba(99,102,241,0.06); border-color:var(--accent-1); }
+
+  .toggle-switch{ width:56px; height:30px; border-radius:9999px; background: linear-gradient(90deg,var(--accent-1),var(--accent-2)); cursor:pointer; padding:3px; display:inline-flex; align-items:center; }
+  .toggle-ball{ width:24px; height:24px; border-radius:9999px; background:#fff; transform:translateX(0); transition:transform .28s ease; display:flex; align-items:center; justify-content:center; font-size:12px; }
+  .dark .toggle-ball{ transform:translateX(26px); background:#facc15; }
+
+  .reveal{ opacity:0; transform:translateY(8px); transition:opacity .32s ease, transform .32s ease; }
+  .reveal.visible{ opacity:1; transform:none; }
+
+  /* gallery */
+  .gallery-viewport{ position:relative; overflow:hidden; border-radius:12px; background:#000; min-height:260px; }
+  .gallery-track{ display:flex; transition:transform .48s cubic-bezier(.2,.9,.12,1); will-change:transform; }
+  .video-slide{ flex:0 0 100%; position:relative; display:flex; align-items:center; justify-content:center; }
+  .video-slide video{ width:100%; height:100%; object-fit:cover; border-radius:12px; display:block; background:#000; }
+
+  /* Centered overlay controls (only visible on hover / touch-active) */
+  .video-overlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .18s ease;
+    z-index:35;
+  }
+  /* appear on hover or touch-active */
+  .video-slide:hover .video-overlay,
+  .video-slide.touch-active .video-overlay { opacity:1; pointer-events:auto; }
+
+  .controls {
+    display:flex;
+    gap:10px;
+    align-items:center;
+    justify-content:center;
+    padding:8px;
+    border-radius:999px;
+    /* translucent dark backdrop for buttons */
+    background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.45));
+    backdrop-filter: blur(6px);
+    pointer-events:auto;
+    transition: transform .16s ease, box-shadow .16s ease, opacity .12s ease;
+    transform: translateY(0);
+    margin: 0 auto;
+    width: fit-content;
+  }
+  .controls:has(.ctrl-btn:hover) { transform: translateY(-2px); }
+
+  /* buttons: purple accent, rounded, hover animation */
+  .ctrl-btn{
+    width:48px;
+    height:48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:9999px;
+    background: linear-gradient(90deg,var(--accent-1),var(--accent-2));
+    color:#fff;
+    cursor:pointer;
+    border: none;
+    font-size:18px;
+    transition: transform .14s ease, box-shadow .14s ease, opacity .14s ease;
+    box-shadow: 0 6px 18px rgba(99,102,241,0.14);
+    will-change:transform;
+  }
+  .ctrl-btn:hover{ transform: scale(1.06); box-shadow: 0 10px 28px rgba(99,102,241,0.18); }
+  .ctrl-btn:active{ transform: scale(.98); }
+
+  /* fallback style for old browsers (keeps look consistent) */
+  .ctrl-btn.fallback { background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.08); color:#fff; }
+
+  .gallery-fade{ position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .18s ease; z-index:30; background:linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.06)); }
+  .gallery-fade.active{ opacity:1; }
+
+  .side-arrow{
+    position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:40;
+    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9)); border:1px solid rgba(2,6,23,0.06); color:var(--arrow); transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .side-arrow:hover{ transform:translateY(-50%) scale(1.06); box-shadow:0 8px 20px rgba(2,6,23,0.12); }
+  .dark .side-arrow{ background:linear-gradient(180deg, rgba(12,17,26,0.72), rgba(17,24,39,0.72)); border:1px solid rgba(255,255,255,0.04); color:var(--arrow); }
+  .side-arrow.left{ left:12px; } .side-arrow.right{ right:12px; }
+  @media (max-width:640px){ .side-arrow{ width:40px; height:40px; } }
+
+  .indicators{ position:absolute; left:50%; transform:translateX(-50%); bottom:12px; display:flex; gap:8px; z-index:45; }
+  .dot{ width:10px; height:10px; border-radius:999px; background:var(--dot-inactive); transition:transform .14s ease, background .18s ease; cursor:pointer; border:1px solid rgba(0,0,0,0.06); }
+  .dot.active{ background:var(--dot-active); transform:scale(1.12); }
+
+  /* stories */
+  .stories-section{ 
+    position:relative; 
+    overflow:hidden; 
+    padding-top: 24px;
+    padding-bottom: 40px;
+  }
+  .stories-viewport{ 
+    /* Ensure hovered cards can rise above without being clipped */
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding-top: 20px;
+    padding-bottom: 8px;
+  }
+  .stories-track{ 
+    display:flex; 
+    gap:16px; 
+    transition:transform .42s cubic-bezier(.2,.9,.12,1); 
+    will-change:transform; 
+    align-items:stretch; 
+  }
+  .review-card{ 
+    width:calc((100% - (16px * 4))/5); 
+    aspect-ratio:1/1; 
+    flex:0 0 auto; 
+    border-radius:14px; 
+    padding:1.5rem; 
+    background:var(--card-bg);
+    border: 1px solid rgba(2,6,23,0.06);
+    box-shadow:
+      0 4px 6px -1px rgba(0,0,0,0.05),
+      0 2px 4px -1px rgba(0,0,0,0.03);
+    color:var(--text); 
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    will-change: transform, box-shadow;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .review-card::before{
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    border-radius: 14px;
+  }
+  .review-card > * {
+    position: relative;
+    z-index: 1;
+  }
+  .review-card:hover{ 
+    transform: translateY(-16px) scale(1.05); 
+    box-shadow: 
+      0 25px 50px -12px rgba(0,0,0,0.15),
+      0 0 0 1px rgba(99,102,241,0.2),
+      0 0 50px var(--glow-light);
+    z-index:60;
+    border-color: rgba(99,102,241,0.3);
+  }
+  .review-card:hover::before{
+    opacity: 0.08;
+  }
+  .dark .review-card{ 
+    background:var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow:
+      0 4px 6px -1px rgba(0,0,0,0.3),
+      0 2px 4px -1px rgba(0,0,0,0.2);
+  }
+  .dark .review-card:hover{
+    box-shadow: 
+      0 25px 50px -12px rgba(0,0,0,0.5),
+      0 0 0 1px rgba(139,92,246,0.4),
+      0 0 50px var(--glow-strong);
+    border-color: rgba(139,92,246,0.4);
+  }
+
+  .stories-arrow{
+    position:absolute; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius:6px; display:flex; align-items:center; justify-content:center; z-index:30; cursor:pointer; color:var(--arrow);
+    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9)); border:1px solid rgba(2,6,23,0.06); transition:transform .12s ease;
+  }
+  .stories-arrow:hover{ transform:translateY(-50%) scale(1.06); box-shadow:0 8px 20px rgba(2,6,23,0.12); }
+  .dark .stories-arrow{ background:linear-gradient(180deg, rgba(12,17,26,0.72), rgba(17,24,39,0.72)); border:1px solid rgba(255,255,255,0.04); }
+  .stories-arrow.left{ left:10px } .stories-arrow.right{ right:10px }
+
+  @media (max-width:1024px){ 
+    .review-card{ width:calc((100% - (16px * 2))/3); }
+    .stories-track{ gap:16px; }
+  }
+  @media (max-width:640px){ 
+    .review-card{ width:calc((100% - 16px)/1); }
+    .stories-track{ gap:16px; }
+    .review-card{ padding:1.25rem; }
+  }
+
+  /* overlays */
+  .overlay { position:fixed; inset:0; background:rgba(2,6,23,0.35); display:flex; align-items:center; justify-content:center; z-index:60; }
+  .modal { width:100%; max-width:460px; border-radius:12px; padding:18px; background:var(--card-bg); box-shadow:0 12px 40px rgba(2,6,23,0.2); }
+
+  /* ensure header matches body color in both themes (overrides Tailwind utility) */
+  header { background: var(--bg); }
+  .dark header { background: var(--bg); }
+
+  .hidden{ display:none !important; }
+
+  /* Chat window and card minimum height */
+  #chatCard{ min-height:320px; display: flex; flex-direction: column; }
+  #chatWindow{ 
+    height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  
+  /* Featured Images Slideshow */
+  .images-section{ position:relative; }
+  .images-viewport{ position:relative; overflow:hidden; border-radius:12px; height:300px; }
+  .images-track{ display:flex; transition:transform .5s cubic-bezier(.2,.9,.12,1); will-change:transform; height:100%; }
+  .image-slide{ flex:0 0 100%; position:relative; height:100%; }
+  .image-slide img{ width:100%; height:100%; object-fit:cover; border-radius:12px; display:block; }
+  
+  .images-arrow{
+    position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:40;
+    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9)); border:1px solid rgba(2,6,23,0.06); color:var(--arrow); transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .images-arrow:hover{ transform:translateY(-50%) scale(1.06); box-shadow:0 8px 20px rgba(2,6,23,0.12); }
+  .dark .images-arrow{ background:linear-gradient(180deg, rgba(12,17,26,0.72), rgba(17,24,39,0.72)); border:1px solid rgba(255,255,255,0.04); color:var(--arrow); }
+  .images-arrow.left{ left:12px; } .images-arrow.right{ right:12px; }
+  
+  .images-indicators{ position:absolute; left:50%; transform:translateX(-50%); bottom:12px; display:flex; gap:8px; z-index:45; }
+  .image-dot{ width:10px; height:10px; border-radius:999px; background:var(--dot-inactive); transition:transform .14s ease, background .18s ease; cursor:pointer; border:1px solid rgba(0,0,0,0.06); }
+  .image-dot.active{ background:var(--dot-active); transform:scale(1.12); }
+  #chatWindow::-webkit-scrollbar {
+    width: 6px;
+  }
+  #chatWindow::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  #chatWindow::-webkit-scrollbar-thumb {
+    background: rgba(99,102,241,0.3);
+    border-radius: 3px;
+  }
+  #chatWindow::-webkit-scrollbar-thumb:hover {
+    background: rgba(99,102,241,0.5);
+  }
+  .dark #chatWindow::-webkit-scrollbar-thumb {
+    background: rgba(139,92,246,0.4);
+  }
+  .dark #chatWindow::-webkit-scrollbar-thumb:hover {
+    background: rgba(139,92,246,0.6);
+  }
+
+  /* --- Upload button improvements --- */
+  .upload-btn {
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:.55rem .75rem;
+    border-radius:999px;
+    font-size:.95rem;
+    font-weight:600;
+    cursor:pointer;
+    user-select:none;
+    transition: transform .14s ease, box-shadow .18s ease, background .14s ease;
+    background: linear-gradient(90deg,var(--accent-1),var(--accent-2));
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(99,102,241,0.14);
+    border: none;
+  }
+  .upload-btn:hover { transform: translateY(-3px); box-shadow: 0 14px 36px rgba(99,102,241,0.18); }
+  .upload-btn:active { transform: translateY(-1px) scale(.99); }
+
+  /* file chosen small tag */
+  .file-selected {
+    font-size: .85rem;
+    color: var(--muted);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* responsive adjustments for upload area */
+  @media (max-width:640px){
+    .upload-btn { padding:.5rem .65rem; font-size:.92rem; gap:8px; }
+    .ctrl-btn{ width:44px; height:44px; font-size:16px; }
+  }
+
+  /* Uniform styling for all inputs and textareas */
+.form-input,
+textarea.form-input,
+input.form-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(2,6,23,0.08);
+  background: transparent;
+  color: inherit;
+  transition: all 0.25s ease;
+  font-size: 0.95rem;
+}
+
+/* Placeholder color */
+.form-input::placeholder {
+  color: var(--muted);
+  opacity: 0.9;
+}
+
+/* Hover effect (subtle lift and border highlight) */
+.form-input:hover {
+  border-color: var(--accent-1);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.06);
+}
+
+/* Focus effect (stronger accent glow) */
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent-1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.04);
+}
+
+/* Disabled state consistency */
+.form-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dark mode improvements */
+.dark .form-input {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(17,24,39,0.35);
+}
+.dark .form-input:hover {
+  border-color: var(--accent-2);
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.15);
+}
+.dark .form-input:focus {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+</style>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"></script>
+
+</head>
+<body>
+
+<!-- Firebase & Services Configuration -->
+<script src="/firebase-config.js"></script>
+
+<!-- Header -->
+<header class="sticky top-0 z-50">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold">MH</div>
+      <h1 class="text-lg font-bold text-indigo-700 dark:text-indigo-300">Mental Health Demo</h1>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div id="themeToggle" class="toggle-switch" role="button" tabindex="0"><div id="toggleBall" class="toggle-ball">🌙</div></div>
+      <button id="loginBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Login / Signup</button>
+      <button id="profileBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hidden">My Profile</button>
+    </div>
+  </div>
+</header>
+
+<!-- Featured Experiences -->
+<section class="py-6 reveal">
+  <div class="max-w-6xl mx-auto px-4">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-2xl sm:text-3xl font-semibold text-indigo-700 dark:text-indigo-300">Featured Experiences</h2>
+    </div>
+
+    <div class="relative gallery-viewport card h-64 sm:h-80 lg:h-[460px]">
+      <div id="galleryFade" class="gallery-fade"></div>
+
+      <button id="prevVideo" class="side-arrow left" aria-label="Previous">‹</button>
+
+      <div id="galleryTrack" class="gallery-track">
+        <div class="video-slide">
+          <video playsinline preload="auto" muted>
+            <source src="videos/Muks.mp4" type="video/mp4">
+          </video>
+          <div class="video-overlay">
+            <!-- centered controls -->
+            <div class="controls" aria-hidden="false">
+              <div class="ctrl-btn" data-action="playpause" aria-label="Play/Pause">▶︎</div>
+              <div class="ctrl-btn" data-action="mute" aria-label="Mute/Unmute">🔇</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="video-slide">
+          <video playsinline preload="auto">
+            <source src="videos/Osho.mp4" type="video/mp4">
+          </video>
+          <div class="video-overlay">
+            <div class="controls" aria-hidden="false">
+              <div class="ctrl-btn" data-action="playpause" aria-label="Play/Pause">▶︎</div>
+              <div class="ctrl-btn" data-action="mute" aria-label="Mute/Unmute">🔇</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="video-slide">
+          <video playsinline preload="auto">
+            <source src="videos/Piyush.mp4" type="video/mp4">
+          </video>
+          <div class="video-overlay">
+            <div class="controls" aria-hidden="false">
+              <div class="ctrl-btn" data-action="playpause" aria-label="Play/Pause">▶︎</div>
+              <div class="ctrl-btn" data-action="mute" aria-label="Mute/Unmute">🔇</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="video-slide">
+          <video playsinline preload="auto">
+            <source src="videos/Teacher.mp4" type="video/mp4">
+          </video>
+          <div class="video-overlay">
+            <div class="controls" aria-hidden="false">
+              <div class="ctrl-btn" data-action="playpause" aria-label="Play/Pause">▶︎</div>
+              <div class="ctrl-btn" data-action="mute" aria-label="Mute/Unmute">🔇</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="nextVideo" class="side-arrow right" aria-label="Next">›</button>
+
+      <div class="indicators">
+        <div id="dot0" class="dot" data-index="0" title="1"></div>
+        <div id="dot1" class="dot" data-index="1" title="2"></div>
+        <div id="dot2" class="dot" data-index="2" title="3"></div>
+        <div id="dot3" class="dot" data-index="3" title="4"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Main: Share + Chat + Reach Out -->
+<main class="flex-1 max-w-6xl mx-auto px-4 py-8 space-y-8 w-full">
+  <section class="reveal">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Top Row: Realtime Chat and Share Your Experience -->
+      <div id="chatCard" class="card p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex flex-col">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">Realtime Chat</h3>
+            <p class="text-sm muted">Login to send messages.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="clearChatBtn" class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Clear</button>
+            <div class="text-sm muted">Live</div>
+          </div>
+        </div>
+
+        <div id="chatWindow" class="mt-4 p-3 rounded-md bg-gray-50 dark:bg-gray-900"></div>
+
+        <div class="mt-3 flex items-center gap-2">
+          <input id="messageInput" class="form-input" placeholder="Type a message..." />
+          <button id="sendBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Send</button>
+        </div>
+      </div>
+
+      <!-- Share Your Experience -->
+      <div class="card p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">Share Your Experience</h3>
+        <p class="text-sm muted mt-2">Write a short message — optionally upload a photo or short video.</p>
+
+        <label class="block mt-4 text-sm">Message</label>
+        <textarea id="shareMessage" rows="4" class="form-input mt-2" placeholder="Your message..."></textarea>
+
+        <div class="mt-3 flex items-center gap-3">
+          <!-- improved upload button -->
+          <label for="shareFile" id="uploadLabel" class="upload-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 13a4 4 0 004 4h6a4 4 0 100-8 5 5 0 10-9.9.9" /></svg>
+            <span>Choose photo/video</span>
+          </label>
+          <input id="shareFile" type="file" accept="image/*,video/*" class="hidden"/>
+          <div id="fileName" class="text-sm file-selected muted">No file chosen</div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between">
+          <div class="text-xs muted">Max 200MB.</div>
+          <button id="shareSend" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Send</button>
+        </div>
+      </div>
+
+      <!-- Reach Out For Help -->
+      <div id="reachCard" class="card p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex flex-col">
+        <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">Reach Out For Help</h3>
+        <p class="text-sm muted mt-2">If you'd like someone to contact you, fill out the form below.</p>
+
+        <form id="contactForm" class="grid grid-cols-1 gap-4 mt-4 flex-1" action="https://formsubmit.co/singhkrish.np@gmail.com" method="POST">
+          <input type="hidden" name="_captcha" value="false">
+          <input type="hidden" name="_next" value="https://example.com/thank-you">
+          <input name="name" placeholder="Your Name" class="form-input" required />
+          <input name="email" type="email" placeholder="Your Email" class="form-input" required />
+          <textarea name="message" rows="4" placeholder="How can we help?" class="form-input flex-1" required></textarea>
+          <div class="text-right">
+            <button type="submit" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Send</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Bottom Row: Featured Images -->
+
+      <!-- Featured Images -->
+      <div class="card p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 images-section lg:row-start-1 lg:col-start-2">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">Featured Images</h3>
+        </div>
+
+        <div class="images-viewport">
+          <button id="prevImage" class="images-arrow left" aria-label="Previous">‹</button>
+          <button id="nextImage" class="images-arrow right" aria-label="Next">›</button>
+
+          <div id="imagesTrack" class="images-track">
+            <div class="image-slide">
+              <img src="https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=600&fit=crop" alt="Featured Image 1" />
+            </div>
+            <div class="image-slide">
+              <img src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800&h=600&fit=crop" alt="Featured Image 2" />
+            </div>
+            <div class="image-slide">
+              <img src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&h=600&fit=crop" alt="Featured Image 3" />
+            </div>
+            <div class="image-slide">
+              <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop" alt="Featured Image 4" />
+            </div>
+            <div class="image-slide">
+              <img src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&h=600&fit=crop" alt="Featured Image 5" />
+            </div>
+          </div>
+
+          <div class="images-indicators">
+            <div id="imgDot0" class="image-dot active" data-index="0"></div>
+            <div id="imgDot1" class="image-dot" data-index="1"></div>
+            <div id="imgDot2" class="image-dot" data-index="2"></div>
+            <div id="imgDot3" class="image-dot" data-index="3"></div>
+            <div id="imgDot4" class="image-dot" data-index="4"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Community Stories -->
+  <section class="reveal stories-section card p-6 pt-8 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h3 class="text-xl font-semibold text-indigo-700 dark:text-indigo-300">Community Stories</h3>
+        <p class="text-sm muted mt-1">Read experiences shared by our community members</p>
+      </div>
+    </div>
+
+    <div class="relative">
+      <button id="storiesPrev" class="stories-arrow left" aria-label="Prev">‹</button>
+      <button id="storiesNext" class="stories-arrow right" aria-label="Next">›</button>
+
+      <div class="stories-viewport">
+        <div id="storiesTrack" class="stories-track">
+          <div class="review-card">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <div class="font-semibold text-base">Aarav S.</div>
+                <div class="text-xs muted mt-1">Student</div>
+              </div>
+              <div class="text-2xl opacity-20">"</div>
+            </div>
+            <p class="text-sm leading-relaxed">This space helped me rediscover calm in tough times. The community support made all the difference.</p>
+          </div>
+          <div class="review-card">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <div class="font-semibold text-base">Nisha K.</div>
+                <div class="text-xs muted mt-1">Counsellor</div>
+              </div>
+              <div class="text-2xl opacity-20">"</div>
+            </div>
+            <p class="text-sm leading-relaxed">I finally felt heard and supported. This platform provides a safe space for everyone to share.</p>
+          </div>
+          <div class="review-card">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <div class="font-semibold text-base">Ritika P.</div>
+                <div class="text-xs muted mt-1">Volunteer</div>
+              </div>
+              <div class="text-2xl opacity-20">"</div>
+            </div>
+            <p class="text-sm leading-relaxed">A comforting place when I needed it most. The resources and community here are invaluable.</p>
+          </div>
+          <div class="review-card">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <div class="font-semibold text-base">Rohan T.</div>
+                <div class="text-xs muted mt-1">Learner</div>
+              </div>
+              <div class="text-2xl opacity-20">"</div>
+            </div>
+            <p class="text-sm leading-relaxed">Helped me understand my emotions better. The guidance and support here is truly meaningful.</p>
+          </div>
+          <div class="review-card">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <div class="font-semibold text-base">Meera D.</div>
+                <div class="text-xs muted mt-1">Member</div>
+              </div>
+              <div class="text-2xl opacity-20">"</div>
+            </div>
+            <p class="text-sm leading-relaxed">Encouraged me to reach out and connect. This platform has been a positive influence in my journey.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 py-6">
+  <div class="max-w-6xl mx-auto px-4 text-sm muted text-center">© 2025 Mental Health Demo</div>
+</footer>
+
+<!-- AUTH modal -->
+<div id="authOverlay" class="overlay hidden">
+  <div class="modal">
+    <div class="flex items-center justify-between mb-3">
+      <h4 id="authTitle" class="text-lg font-semibold">Login</h4>
+      <button id="closeAuth" class="text-sm muted">✕</button>
+    </div>
+
+    <!-- Login -->
+    <form id="loginForm" class="space-y-3">
+      <input id="loginEmail" type="email" placeholder="Email" class="form-input" required />
+      <input id="loginPassword" type="password" placeholder="Password" class="form-input" required />
+      <div class="flex items-center justify-between">
+        <button type="submit" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Login</button>
+        <button id="showSignup" type="button" class="text-sm text-indigo-600">Create account</button>
+      </div>
+    </form>
+
+    <!-- Signup -->
+    <form id="signupForm" class="space-y-3 hidden">
+      <input id="signupName" placeholder="Full name" class="form-input" required />
+      <input id="signupEmail" type="email" placeholder="Email" class="form-input" required />
+      <input id="signupPassword" type="password" placeholder="Password (min 6)" class="form-input" required />
+      <div class="flex items-center justify-between">
+        <button id="sendOtpBtn" type="button" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Send OTP</button>
+        <button id="showLogin" type="button" class="text-sm text-indigo-600">Back to login</button>
+      </div>
+    </form>
+
+    <!-- OTP -->
+    <form id="otpForm" class="space-y-3 hidden">
+      <p class="text-sm muted">OTP sent to <span id="otpTarget"></span> (simulated)</p>
+      <input id="otpInput" placeholder="Enter OTP" class="form-input" />
+      <div class="flex items-center justify-between">
+        <button id="verifyOtpBtn" type="button" class="px-3 py-2 rounded-full bg-indigo-600 text-white font-semibold">Verify OTP</button>
+        <button id="resendOtpBtn" type="button" class="text-sm text-indigo-600">Resend</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- PROFILE modal -->
+<div id="profileOverlay" class="overlay hidden">
+  <div class="modal">
+    <div class="flex items-center justify-between mb-3">
+      <h4 class="text-lg font-semibold">Profile</h4>
+      <button id="closeProfile" class="text-sm muted">✕</button>
+    </div>
+    <div class="space-y-3">
+      <div><label class="text-sm">Email (unchangeable)</label><div id="profileEmail" class="p-2 bg-gray-50 dark:bg-gray-900 rounded-md"></div></div>
+      <div><label class="text-sm">Name</label><input id="profileName" class="form-input" /></div>
+      <div class="flex items-center gap-2">
+        <button id="updateNameBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Update Name</button>
+        <button id="changePasswordBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Change Password</button>
+      </div>
+      <div class="flex justify-between items-center">
+        <button id="logoutBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Logout</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* THEME */
+const themeToggle = document.getElementById('themeToggle');
+const toggleBall = document.getElementById('toggleBall');
+function setTheme(t){ if(t==='dark'){ document.documentElement.classList.add('dark'); toggleBall.innerText='☀️'; } else { document.documentElement.classList.remove('dark'); toggleBall.innerText='🌙'; } }
+const stored = localStorage.getItem('mh_theme');
+setTheme(stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+themeToggle.addEventListener('click', ()=>{ const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark'; setTheme(next); localStorage.setItem('mh_theme', next); });
+
+/* reveals */
+const reveals = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver(entries=> entries.forEach(e=> { if(e.isIntersecting) e.target.classList.add('visible'); }), { threshold: .08 });
+reveals.forEach(r=> io.observe(r));
+
+/* SIMPLE AUTH (localStorage/sessionStorage) */
+const ACC_KEY = 'mh_demo_accounts_v2';
+const OTP_STORAGE_KEY = 'mh_otp_storage';
+const INSTITUTIONAL_EMAIL_DOMAIN = '@bl.students.amrita.edu';
+
+function loadAccounts(){ try{ return JSON.parse(localStorage.getItem(ACC_KEY)||'[]'); }catch(e){ return []; } }
+function saveAccounts(a){ localStorage.setItem(ACC_KEY, JSON.stringify(a)); }
+function setCurrentUser(u){ 
+  sessionStorage.setItem('mh_current', JSON.stringify(u)); 
+  document.getElementById('loginBtn').classList.add('hidden'); 
+  document.getElementById('profileBtn').classList.remove('hidden'); 
+  document.getElementById('profileEmail').innerText = u.email; 
+  document.getElementById('profileName').value = u.name || ''; 
+}
+function getCurrentUser(){ try{ return JSON.parse(sessionStorage.getItem('mh_current')||'null'); }catch(e){ return null; } }
+function logout(){ 
+  sessionStorage.removeItem('mh_current'); 
+  document.getElementById('profileBtn').classList.add('hidden'); 
+  document.getElementById('loginBtn').classList.remove('hidden'); 
+  alert('✅ Logged out successfully'); 
+}
+
+/* Email validation for institutional email */
+function validateInstitutionalEmail(email){
+  if(!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return normalized.endsWith(INSTITUTIONAL_EMAIL_DOMAIN);
+}
+
+/* OTP generation and storage */
+function generateOTP(){
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function storeOTP(email, otp){
+  const otps = JSON.parse(localStorage.getItem(OTP_STORAGE_KEY) || '{}');
+  otps[email] = { code: otp, timestamp: Date.now(), attempts: 0 };
+  localStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(otps));
+}
+
+function verifyOTP(email, inputOTP){
+  const otps = JSON.parse(localStorage.getItem(OTP_STORAGE_KEY) || '{}');
+  const stored = otps[email];
+  if(!stored) return { valid: false, message: 'No OTP found. Please request a new one.' };
+  
+  // Check if OTP expired (10 minutes)
+  const now = Date.now();
+  const expiry = 10 * 60 * 1000; // 10 minutes
+  if(now - stored.timestamp > expiry){
+    delete otps[email];
+    localStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(otps));
+    return { valid: false, message: 'OTP expired. Please request a new one.' };
+  }
+  
+  // Check attempts (max 5)
+  if(stored.attempts >= 5){
+    delete otps[email];
+    localStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(otps));
+    return { valid: false, message: 'Too many failed attempts. Please request a new OTP.' };
+  }
+  
+  if(stored.code === inputOTP){
+    delete otps[email];
+    localStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(otps));
+    return { valid: true, message: 'OTP verified successfully!' };
+  } else {
+    stored.attempts++;
+    otps[email] = stored;
+    localStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(otps));
+    return { valid: false, message: `Incorrect OTP. ${5 - stored.attempts} attempts remaining.` };
+  }
+}
+
+/* AUTH MODAL UI */
+const authOverlay = document.getElementById('authOverlay');
+const loginForm = document.getElementById('loginForm');
+const signupForm = document.getElementById('signupForm');
+const otpForm = document.getElementById('otpForm');
+const showSignup = document.getElementById('showSignup');
+const showLogin = document.getElementById('showLogin');
+const sendOtpBtn = document.getElementById('sendOtpBtn');
+const otpTarget = document.getElementById('otpTarget');
+const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+const resendOtpBtn = document.getElementById('resendOtpBtn');
+
+let pendingSignup = null;
+
+function openAuth(mode='login'){
+  authOverlay.classList.remove('hidden');
+  if(mode==='login'){ loginForm.classList.remove('hidden'); signupForm.classList.add('hidden'); otpForm.classList.add('hidden'); document.getElementById('authTitle').innerText='Login'; }
+  if(mode==='signup'){ signupForm.classList.remove('hidden'); loginForm.classList.add('hidden'); otpForm.classList.add('hidden'); document.getElementById('authTitle').innerText='Create account'; }
+  if(mode==='otp'){ otpForm.classList.remove('hidden'); loginForm.classList.add('hidden'); signupForm.classList.add('hidden'); document.getElementById('authTitle').innerText='Verify OTP'; }
+}
+function closeAuth(){ authOverlay.classList.add('hidden'); }
+
+document.getElementById('loginBtn').addEventListener('click', ()=> openAuth('login'));
+showSignup.addEventListener('click', ()=> openAuth('signup'));
+showLogin.addEventListener('click', ()=> openAuth('login'));
+document.getElementById('closeAuth').addEventListener('click', closeAuth);
+authOverlay.addEventListener('click', e=> { if(e.target===authOverlay) closeAuth(); });
+
+/* LOGIN */
+loginForm.addEventListener('submit', e=>{
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pwd = document.getElementById('loginPassword').value;
+  
+  // Validate institutional email
+  if(!validateInstitutionalEmail(email)){
+    alert('❌ Please use your institutional email (@bl.students.amrita.edu)');
+    return;
+  }
+  
+  if(!pwd || pwd.length < 6){
+    alert('❌ Password must be at least 6 characters');
+    return;
+  }
+  
+  const accs = loadAccounts();
+  const user = accs.find(a=>a.email===email && a.password===pwd && a.verified);
+  if(!user){ 
+    alert('❌ Wrong credentials or unverified account. Please check your email and password.'); 
+    return; 
+  }
+  setCurrentUser(user);
+  alert('✅ Login successful!');
+  closeAuth();
+  
+  // Load chat history on login
+  loadChatHistory();
+});
+
+/* SIGNUP SEND OTP */
+sendOtpBtn.addEventListener('click', ()=>{
+  const name = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim().toLowerCase();
+  const pwd = document.getElementById('signupPassword').value;
+  
+  if(!name || name.length < 2){
+    alert('❌ Please enter a valid name (at least 2 characters)');
+    return;
+  }
+  
+  if(!validateInstitutionalEmail(email)){
+    alert('❌ Please use your institutional email ending with @bl.students.amrita.edu');
+    return;
+  }
+  
+  if(!pwd || pwd.length < 6){
+    alert('❌ Password must be at least 6 characters long');
+    return;
+  }
+  
+  // Check if account already exists
+  const accs = loadAccounts();
+  if(accs.some(a=>a.email===email)){
+    alert('❌ Account already exists. Please login instead.');
+    openAuth('login');
+    return;
+  }
+  
+  // Generate and store OTP
+  const otp = generateOTP();
+  storeOTP(email, otp);
+  pendingSignup = { name, email, password: pwd };
+  otpTarget.innerText = email;
+  openAuth('otp');
+  
+  // Simulate OTP sending (in production, this would send via email)
+  alert(`📨 OTP sent to ${email}\n\nSimulated OTP: ${otp}\n(In production, this would be sent via email)`);
+});
+
+verifyOtpBtn.addEventListener('click', ()=>{
+  const code = document.getElementById('otpInput').value.trim();
+  if(!pendingSignup) {
+    alert('❌ No signup in progress. Please start the signup process again.');
+    return;
+  }
+  
+  if(!code || code.length !== 6){
+    alert('❌ Please enter a valid 6-digit OTP');
+    return;
+  }
+  
+  const result = verifyOTP(pendingSignup.email, code);
+  if(!result.valid){
+    alert(`❌ ${result.message}`);
+    return;
+  }
+  
+  // Create account
+  const accs = loadAccounts();
+  const newAcc = { 
+    name: pendingSignup.name, 
+    email: pendingSignup.email, 
+    password: pendingSignup.password, 
+    verified: true,
+    createdAt: new Date().toISOString()
+  };
+  accs.push(newAcc); 
+  saveAccounts(accs);
+  
+  pendingSignup = null;
+  document.getElementById('otpInput').value = '';
+  alert('✅ Account created and verified successfully! Logged in.');
+  setCurrentUser(newAcc);
+  closeAuth();
+  
+  // Load chat history
+  loadChatHistory();
+});
+
+resendOtpBtn.addEventListener('click', ()=> { 
+  if(!pendingSignup) {
+    alert('❌ No signup in progress.');
+    return;
+  }
+  
+  const otp = generateOTP();
+  storeOTP(pendingSignup.email, otp);
+  alert(`📨 OTP resent to ${pendingSignup.email}\n\nSimulated OTP: ${otp}\n(In production, this would be sent via email)`);
+});
+
+/* PROFILE */
+const profileOverlay = document.getElementById('profileOverlay');
+const profileBtn = document.getElementById('profileBtn');
+const closeProfile = document.getElementById('closeProfile');
+const profileName = document.getElementById('profileName');
+const updateNameBtn = document.getElementById('updateNameBtn');
+const changePasswordBtn = document.getElementById('changePasswordBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+
+profileBtn.addEventListener('click', ()=> profileOverlay.classList.remove('hidden'));
+closeProfile.addEventListener('click', ()=> profileOverlay.classList.add('hidden'));
+logoutBtn.addEventListener('click', ()=> { logout(); profileOverlay.classList.add('hidden'); });
+
+updateNameBtn.addEventListener('click', ()=>{
+  const u = getCurrentUser(); 
+  if(!u) return alert('❌ No user logged in');
+  
+  const newName = profileName.value.trim(); 
+  if(!newName || newName.length < 2) {
+    alert('❌ Please enter a valid name (at least 2 characters)');
+    return;
+  }
+  
+  // Generate OTP for name change
+  const otp = generateOTP();
+  storeOTP(u.email, otp);
+  const code = prompt(`📨 OTP sent to ${u.email}\n\nSimulated OTP: ${otp}\n\nEnter OTP to confirm name change:`);
+  
+  if(!code){
+    return;
+  }
+  
+  const result = verifyOTP(u.email, code);
+  if(!result.valid){
+    alert(`❌ ${result.message}`);
+    return;
+  }
+  
+  const accs = loadAccounts(); 
+  const idx = accs.findIndex(a=>a.email===u.email); 
+  if(idx>=0){ 
+    accs[idx].name = newName; 
+    saveAccounts(accs); 
+    setCurrentUser(accs[idx]); 
+    alert('✅ Name updated successfully!');
+  }
+});
+
+changePasswordBtn.addEventListener('click', ()=>{
+  const u = getCurrentUser(); 
+  if(!u) return alert('❌ No user logged in');
+  
+  const currentPwd = prompt('Enter your current password:');
+  if(!currentPwd) return;
+  
+  // Verify current password
+  const accs = loadAccounts();
+  const user = accs.find(a=>a.email===u.email && a.password===currentPwd);
+  if(!user){
+    alert('❌ Current password is incorrect');
+    return;
+  }
+  
+  const np = prompt('Enter new password (min 6 characters):');
+  if(!np || np.length < 6){
+    alert('❌ Password must be at least 6 characters long');
+    return;
+  }
+  
+  // Generate OTP for password change
+  const otp = generateOTP();
+  storeOTP(u.email, otp);
+  const code = prompt(`📨 OTP sent to ${u.email}\n\nSimulated OTP: ${otp}\n\nEnter OTP to confirm password change:`);
+  
+  if(!code){
+    return;
+  }
+  
+  const result = verifyOTP(u.email, code);
+  if(!result.valid){
+    alert(`❌ ${result.message}`);
+    return;
+  }
+  
+  const idx = accs.findIndex(a=>a.email===u.email);
+  if(idx>=0){ 
+    accs[idx].password = np; 
+    saveAccounts(accs); 
+    alert('✅ Password changed successfully!');
+  }
+});
+
+/* restore session on load */
+window.addEventListener('load', ()=>{ 
+  const cur = getCurrentUser(); 
+  if(cur){ 
+    document.getElementById('loginBtn').classList.add('hidden'); 
+    profileBtn.classList.remove('hidden'); 
+    document.getElementById('profileEmail').innerText = cur.email; 
+    profileName.value = cur.name || ''; 
+  }
+  // Load chat history
+  loadChatHistory();
+  
+  // Add email validation on input
+  const signupEmailInput = document.getElementById('signupEmail');
+  const loginEmailInput = document.getElementById('loginEmail');
+  
+  if(signupEmailInput){
+    signupEmailInput.addEventListener('blur', function(){
+      const email = this.value.trim().toLowerCase();
+      if(email && !validateInstitutionalEmail(email)){
+        this.style.borderColor = '#ef4444';
+        this.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+      } else {
+        this.style.borderColor = '';
+        this.style.boxShadow = '';
+      }
+    });
+  }
+  
+  if(loginEmailInput){
+    loginEmailInput.addEventListener('blur', function(){
+      const email = this.value.trim().toLowerCase();
+      if(email && !validateInstitutionalEmail(email)){
+        this.style.borderColor = '#ef4444';
+        this.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+      } else {
+        this.style.borderColor = '';
+        this.style.boxShadow = '';
+      }
+    });
+  }
+});
+
+/* VIDEO GALLERY - pixel-based loop + autoplay + overlay controls + indicators */
+(function(){
+  const track = document.getElementById('galleryTrack');
+  const slidesOrig = Array.from(track.children);
+  if(!slidesOrig.length) return;
+  const N = slidesOrig.length;
+  // clone
+  const firstClone = slidesOrig[0].cloneNode(true);
+  const lastClone = slidesOrig[N-1].cloneNode(true);
+  firstClone.classList.add('clone'); lastClone.classList.add('clone');
+  track.insertBefore(lastClone, track.firstChild);
+  track.appendChild(firstClone);
+
+  let idx = 0, anim=false;
+  const dots = [document.getElementById('dot0'), document.getElementById('dot1'), document.getElementById('dot2'), document.getElementById('dot3')];
+  const fade = document.getElementById('galleryFade');
+
+  function slideWidth(){ return track.parentElement.getBoundingClientRect().width; }
+  function setPos(i){ const w=slideWidth(); track.style.transition='none'; track.style.transform = `translateX(-${(i+1)*w}px)`; }
+  function updateDots(){ dots.forEach((d,i)=>{ d.classList.toggle('active', i===idx); d.style.background = i===idx ? 'var(--dot-active)' : 'var(--dot-inactive)'; }); }
+
+  // play visible
+  function playVisible(){
+    const children = Array.from(track.children);
+    const pos = idx + 1;
+    const el = children[pos];
+    if(!el) return;
+    const v = el.querySelector('video');
+    if(!v) return;
+    try{ v.currentTime = 0; v.muted = (idx===0); v.play().catch(()=>{}); }catch(e){}
+  }
+
+  function goTo(target){
+    if(anim) return;
+    anim = true; fade.classList.add('active');
+    const w = slideWidth();
+    const visual = target + 1;
+    track.style.transition = 'transform .48s cubic-bezier(.2,.9,.12,1)';
+    track.style.transform = `translateX(-${visual * w}px)`;
+    // pause all videos
+    Array.from(track.querySelectorAll('video')).forEach(v=>{ try{ v.pause(); }catch(e){} });
+    const onEnd = ()=> {
+      track.removeEventListener('transitionend', onEnd);
+      if(visual === 0){ track.style.transition='none'; track.style.transform = `translateX(-${N * w}px)`; target = N - 1; }
+      else if(visual === N + 1){ track.style.transition='none'; track.style.transform = `translateX(-${1 * w}px)`; target = 0; }
+      idx = (target + N) % N;
+      updateDots();
+      fade.classList.remove('active');
+      setTimeout(()=>{ anim=false; playVisible(); }, 30);
+    };
+    track.addEventListener('transitionend', onEnd);
+  }
+
+  // bind arrows/dots
+  document.getElementById('nextVideo').addEventListener('click', ()=> goTo(idx+1));
+  document.getElementById('prevVideo').addEventListener('click', ()=> goTo(idx-1));
+  dots.forEach(d=> d.addEventListener('click', e=> goTo(parseInt(d.dataset.index))));
+
+  // overlays: play/pause, mute
+  function bindOverlays(){
+    const slidesAll = track.querySelectorAll('.video-slide');
+    slidesAll.forEach(sl=>{
+      const btnPlay = sl.querySelector('[data-action="playpause"]');
+      const btnMute = sl.querySelector('[data-action="mute"]');
+      const v = sl.querySelector('video');
+      if(!v) return;
+      let tTO = null;
+      sl.addEventListener('touchstart', ()=>{ sl.classList.add('touch-active'); clearTimeout(tTO); tTO = setTimeout(()=> sl.classList.remove('touch-active'), 3000); });
+
+      // Play / Pause
+      btnPlay.addEventListener('click', (ev)=>{ ev.stopPropagation(); if(v.paused){ v.play().catch(()=>{}); btnPlay.textContent='❚❚'; } else { v.pause(); btnPlay.textContent='▶︎'; } });
+      // Mute / Unmute
+      btnMute.addEventListener('click', (ev)=>{ ev.stopPropagation(); v.muted = !v.muted; btnMute.textContent = v.muted ? '🔇' : '🔊'; });
+
+      v.addEventListener('play', ()=> btnPlay.textContent='❚❚');
+      v.addEventListener('pause', ()=> btnPlay.textContent='▶︎');
+      // if a user pauses, we won't auto-advance until play finishes naturally again
+    });
+  }
+
+  // bind ended to children 1..N
+  function bindEnded(){
+    const children = Array.from(track.children);
+    for(let i=1;i<=N;i++){
+      const v = children[i].querySelector('video'); if(!v) continue;
+      v.onended = ()=> { goTo(((i-1)+1) % N); };
+    }
+  }
+
+  // swipe
+  (function(){ let sx=0; const view = track.parentElement; view.addEventListener('touchstart', e=> sx = e.touches[0].clientX); view.addEventListener('touchend', e=> { const diff = e.changedTouches[0].clientX - sx; if(diff>50) goTo(idx-1); if(diff<-50) goTo(idx+1); }); })();
+
+  // keyboard
+  window.addEventListener('keydown', e=> { if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return; if(e.key==='ArrowLeft') goTo(idx-1); if(e.key==='ArrowRight') goTo(idx+1); });
+
+  // init on load
+  window.addEventListener('load', ()=> {
+    setTimeout(()=>{ setPos(0); bindOverlays(); bindEnded(); updateDots(); playVisible(); }, 120);
+  });
+  window.addEventListener('resize', ()=> setPos(idx));
+})();
+
+/* STORIES carousel (fixed & navigatable) */
+(function(){
+  const track = document.getElementById('storiesTrack');
+  const orig = Array.from(track.children);
+  if(!orig.length) return;
+  const base = orig.length;
+  orig.forEach(n=> track.appendChild(n.cloneNode(true)));
+  let i = 0, moving=false;
+  function cardW(){ const c = track.querySelector('.review-card'); const gap = parseFloat(getComputedStyle(track).gap)||12; return c.getBoundingClientRect().width + gap; }
+  function update(){ track.style.transform = `translateX(-${i * cardW()}px)`; }
+  function next(){ if(moving) return; moving=true; i++; track.style.transition='transform .42s cubic-bezier(.2,.9,.12,1)'; update(); track.addEventListener('transitionend', onEnd); }
+  function prev(){ if(moving) return; moving=true; i--; track.style.transition='transform .42s cubic-bezier(.2,.9,.12,1)'; update(); track.addEventListener('transitionend', onEnd); }
+  function onEnd(){ track.removeEventListener('transitionend', onEnd); if(i>=base){ track.style.transition='none'; i = i % base; update(); } if(i<0){ track.style.transition='none'; i = (base + (i % base)) % base; update(); } setTimeout(()=> moving=false,30); }
+  document.getElementById('storiesNext').addEventListener('click', next);
+  document.getElementById('storiesPrev').addEventListener('click', prev);
+  // swipe
+  (function(){ let sx=0; const view = document.querySelector('.stories-viewport'); view.addEventListener('touchstart', e=> sx = e.touches[0].clientX); view.addEventListener('touchend', e=> { const diff = e.changedTouches[0].clientX - sx; if(diff>40) prev(); if(diff<-40) next(); }); })();
+  window.addEventListener('resize', ()=> { track.style.transition='none'; update(); });
+  update();
+})();
+
+/* SHARE / CONTACT / CHAT */
+/* keep file name display responsive and add small animation on change */
+const shareFileInput = document.getElementById('shareFile');
+const fileNameEl = document.getElementById('fileName');
+const uploadLabel = document.getElementById('uploadLabel');
+
+shareFileInput.addEventListener('change', e=> {
+  const f = e.target.files[0];
+  fileNameEl.textContent = f ? f.name : 'No file chosen';
+  // subtle animation feedback when a file is chosen
+  if(f){
+    uploadLabel.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-3px)' }, { transform: 'translateY(0)' }], { duration: 260, easing: 'ease-out' });
+  }
+});
+
+/* SHARE EXPERIENCE */
+document.getElementById('shareSend').addEventListener('click', async ()=> { 
+  const user = getCurrentUser();
+  if(!user){
+    alert('Please login to share your experience');
+    openAuth('login');
+    return;
+  }
+  
+  const t = document.getElementById('shareMessage').value.trim(); 
+  if(!t) {
+    alert('Please write a message.');
+    return;
+  }
+  
+  const file = document.getElementById('shareFile').files[0];
+  const btn = document.getElementById('shareSend');
+  const originalText = btn.textContent;
+  
+  try {
+    // Upload file to Cloudinary if selected
+    let fileUrl = null;
+    if (file) {
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+      
+      const result = await uploadToCloudinary(file);
+      if (!result.success) {
+        alert(`❌ File upload failed: ${result.error}`);
+        btn.disabled = false;
+        btn.textContent = originalText;
+        return;
+      }
+      fileUrl = result.url;
+    }
+    
+    // Store shared experience
+    const shares = JSON.parse(localStorage.getItem('mh_shared_experiences') || '[]');
+    shares.push({
+      user: user.name || user.email,
+      email: user.email,
+      message: t,
+      fileName: file ? file.name : null,
+      fileUrl: fileUrl, // Cloudinary URL
+      timestamp: Date.now(),
+      date: new Date().toISOString()
+    });
+    localStorage.setItem('mh_shared_experiences', JSON.stringify(shares));
+    
+    const fileInfo = file ? `\n✅ File uploaded to Cloudinary` : '';
+    alert(`✅ Experience shared successfully!${fileInfo}`);
+    
+    // Reset form
+    document.getElementById('shareMessage').value=''; 
+    document.getElementById('shareFile').value=''; 
+    document.getElementById('fileName').textContent='No file chosen';
+    
+  } catch (error) {
+    alert(`❌ Error: ${error.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+});
+
+/* CONTACT FORM - FormSubmit.io Integration */
+document.getElementById('contactForm').addEventListener('submit', e=> { 
+  // FormSubmit.io handles everything, we just show confirmation
+  const button = e.target.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = 'Sending...';
+  
+  // FormSubmit.io will submit the form automatically
+  // After submission, it redirects to the _next URL or shows success
+});
+
+// Show success message if returning from FormSubmit
+window.addEventListener('load', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  if(urlParams.has('success')) {
+    alert('✅ Your message has been sent successfully! We will get back to you soon.');
+  }
+});
+
+/* CHAT: Real-time chat functionality */
+const CHAT_STORAGE_KEY = 'mh_chat_messages';
+let chatMessages = [];
+
+function loadChatHistory(){
+  try{
+    chatMessages = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
+    renderChatMessages();
+  } catch(e){
+    chatMessages = [];
+  }
+}
+
+function saveChatMessage(msg){
+  chatMessages.push(msg);
+  // Keep only last 100 messages
+  if(chatMessages.length > 100){
+    chatMessages = chatMessages.slice(-100);
+  }
+  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
+  renderChatMessages();
+}
+
+function renderChatMessages(){
+  const w = document.getElementById('chatWindow');
+  w.innerHTML = '';
+  
+  if(chatMessages.length === 0){
+    w.innerHTML = '<div class="text-center text-sm muted py-8">No messages yet. Start the conversation!</div>';
+    return;
+  }
+  
+  chatMessages.forEach(msg => {
+    const el = document.createElement('div');
+    const user = getCurrentUser();
+    const isOwn = user && msg.email === user.email;
+    el.className = `p-3 rounded-md mb-2 ${isOwn ? 'bg-indigo-100 dark:bg-indigo-900/30 ml-auto max-w-[80%]' : 'bg-white dark:bg-gray-900'}`;
+    el.innerHTML = `
+      <div class="text-xs muted flex items-center gap-2">
+        <span class="font-semibold">${escapeHtml(msg.from)}</span>
+        <span>•</span>
+        <span>${msg.ts}</span>
+      </div>
+      <div class="mt-1 text-sm">${escapeHtml(msg.text)}</div>
+    `;
+    w.appendChild(el);
+  });
+  w.scrollTop = w.scrollHeight;
+}
+
+function clearAllChats(){
+  if(chatMessages.length === 0) return;
+  if(confirm('Are you sure you want to clear all chat messages?')){
+    chatMessages = [];
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify([]));
+    renderChatMessages();
+  }
+}
+
+const sendBtn = document.getElementById('sendBtn');
+const messageInput = document.getElementById('messageInput');
+const clearChatBtn = document.getElementById('clearChatBtn');
+
+sendBtn.addEventListener('click', ()=>{
+  sendChatMessage();
+});
+
+clearChatBtn.addEventListener('click', ()=>{
+  clearAllChats();
+});
+
+messageInput.addEventListener('keypress', (e)=>{
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendChatMessage();
+  }
+});
+
+function sendChatMessage(){
+  const user = getCurrentUser();
+  if(!user){ 
+    alert('Please login to send messages');
+    openAuth('login'); 
+    return;
+  }
+  
+  const txt = messageInput.value.trim();
+  if(!txt) return;
+  
+  const msg = {
+    from: user.name || user.email.split('@')[0],
+    email: user.email,
+    text: txt,
+    ts: new Date().toLocaleTimeString(),
+    timestamp: Date.now()
+  };
+  
+  saveChatMessage(msg);
+  messageInput.value = '';
+  
+  // Simulate receiving a response (optional - can be removed)
+  setTimeout(() => {
+    if(Math.random() > 0.7){ // 30% chance of auto-response
+      const responses = [
+        'Thank you for sharing!',
+        'We appreciate your message.',
+        'Your message has been received.',
+        'Thank you for reaching out!'
+      ];
+      const autoMsg = {
+        from: 'Support Team',
+        email: 'support@bl.students.amrita.edu',
+        text: responses[Math.floor(Math.random() * responses.length)],
+        ts: new Date().toLocaleTimeString(),
+        timestamp: Date.now()
+      };
+      saveChatMessage(autoMsg);
+    }
+  }, 1000);
+}
+
+/* small escape util */
+function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
+
+/* Accessibility: Esc to close overlays */
+window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.classList.contains('hidden')) closeAuth(); if(!profileOverlay.classList.contains('hidden')) profileOverlay.classList.add('hidden'); } });
+
+/* FEATURED IMAGES SLIDESHOW */
+(function(){
+  const track = document.getElementById('imagesTrack');
+  if(!track) return;
+  const slides = Array.from(track.children);
+  if(!slides.length) return;
+  const N = slides.length;
+  
+  // Clone first and last for infinite loop
+  const firstClone = slides[0].cloneNode(true);
+  const lastClone = slides[N-1].cloneNode(true);
+  firstClone.classList.add('clone');
+  lastClone.classList.add('clone');
+  track.insertBefore(lastClone, track.firstChild);
+  track.appendChild(firstClone);
+  
+  let idx = 0;
+  let anim = false;
+  let autoPlayInterval = null;
+  const dots = [
+    document.getElementById('imgDot0'),
+    document.getElementById('imgDot1'),
+    document.getElementById('imgDot2'),
+    document.getElementById('imgDot3'),
+    document.getElementById('imgDot4')
+  ];
+  
+  function slideWidth(){
+    return track.parentElement.getBoundingClientRect().width;
+  }
+  
+  function setPos(i){
+    const w = slideWidth();
+    track.style.transition = 'none';
+    track.style.transform = `translateX(-${(i+1)*w}px)`;
+  }
+  
+  function updateDots(){
+    dots.forEach((d, i) => {
+      d.classList.toggle('active', i === idx);
+      d.style.background = i === idx ? 'var(--dot-active)' : 'var(--dot-inactive)';
+    });
+  }
+  
+  function goTo(target){
+    if(anim) return;
+    anim = true;
+    const w = slideWidth();
+    const visual = target + 1;
+    track.style.transition = 'transform .5s cubic-bezier(.2,.9,.12,1)';
+    track.style.transform = `translateX(-${visual * w}px)`;
+    
+    const onEnd = () => {
+      track.removeEventListener('transitionend', onEnd);
+      if(visual === 0){
+        track.style.transition = 'none';
+        track.style.transform = `translateX(-${N * w}px)`;
+        target = N - 1;
+      } else if(visual === N + 1){
+        track.style.transition = 'none';
+        track.style.transform = `translateX(-${1 * w}px)`;
+        target = 0;
+      }
+      idx = (target + N) % N;
+      updateDots();
+      setTimeout(() => { anim = false; }, 30);
+    };
+    track.addEventListener('transitionend', onEnd);
+  }
+  
+  function next(){
+    goTo(idx + 1);
+    resetAutoPlay();
+  }
+  
+  function prev(){
+    goTo(idx - 1);
+    resetAutoPlay();
+  }
+  
+  function startAutoPlay(){
+    autoPlayInterval = setInterval(() => {
+      next();
+    }, 4000); // Auto-advance every 4 seconds
+  }
+  
+  function resetAutoPlay(){
+    if(autoPlayInterval){
+      clearInterval(autoPlayInterval);
+      startAutoPlay();
+    }
+  }
+  
+  // Bind arrows
+  document.getElementById('prevImage').addEventListener('click', prev);
+  document.getElementById('nextImage').addEventListener('click', next);
+  
+  // Bind dots
+  dots.forEach(d => {
+    d.addEventListener('click', () => {
+      goTo(parseInt(d.dataset.index));
+      resetAutoPlay();
+    });
+  });
+  
+  // Swipe support
+  (function(){
+    let sx = 0;
+    const view = track.parentElement;
+    view.addEventListener('touchstart', e => {
+      sx = e.touches[0].clientX;
+    });
+    view.addEventListener('touchend', e => {
+      const diff = e.changedTouches[0].clientX - sx;
+      if(diff > 50) prev();
+      if(diff < -50) next();
+    });
+  })();
+  
+  // Keyboard navigation
+  window.addEventListener('keydown', e => {
+    if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+    if(e.key === 'ArrowLeft') prev();
+    if(e.key === 'ArrowRight') next();
+  });
+  
+  // Initialize
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      setPos(0);
+      updateDots();
+      startAutoPlay();
+    }, 120);
+  });
+  
+  window.addEventListener('resize', () => {
+    setPos(idx);
+  });
+  
+  // Pause auto-play on hover
+  const viewport = document.querySelector('.images-viewport');
+  if(viewport){
+    viewport.addEventListener('mouseenter', () => {
+      if(autoPlayInterval) clearInterval(autoPlayInterval);
+    });
+    viewport.addEventListener('mouseleave', () => {
+      startAutoPlay();
+    });
+  }
+})();
+
+</script>
+</body>
+</html>

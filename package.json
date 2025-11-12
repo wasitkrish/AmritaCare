@@ -1,0 +1,38 @@
+{
+  "name": "mental-health-students-site",
+  "version": "1.0.0",
+  "description": "Mental health awareness platform for students with video gallery, AI chat, and community features",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node server.js",
+    "build": "echo 'Build complete. Vercel will handle static files.'",
+    "test": "echo 'Tests not configured yet'"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "openai": "^4.28.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mental-health",
+    "students",
+    "awareness",
+    "chat",
+    "firebase",
+    "cloudinary"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/mental-health-students-site"
+  }
+}
+
