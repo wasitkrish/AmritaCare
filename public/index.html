@@ -2717,17 +2717,44 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
               const j = await r.json();
               if(!r.ok){ console.error('verify-otp failed', j); alert('OTP verification failed: '+(j.error||'invalid')); return; }
               // OTP verified — create Firebase user now
+              console.log('OTP verified, attempting to create Firebase user...', pending);
               try{
-                const cred = await createUserWithEmailAndPassword(auth, pending.email, pending.password);
-                await updateProfile(cred.user, { displayName: pending.name });
-                await setDoc(doc(db,'users', cred.user.uid), { name: pending.name, email: pending.email, createdAt: serverTimestamp() });
-                // Mark email as verified in Firestore user metadata (Firebase client marks emailVerified=false until user clicks link; since OTP verified, we can set a flag)
-                closeAuth();
-                pending = null;
-                document.getElementById('otpInput').value = '';
-                alert('Account created and verified! You can now log in.');
-              }catch(err){ console.error('createUser after OTP failed', err); alert('Failed to create account: '+err.message); }
-            }catch(err){ console.error('verify-otp error', err); alert('OTP verify failed'); }
+                if(!auth){ console.error('Firebase auth not initialized'); alert('Firebase auth not available. Please refresh and try again.'); return; }
+                if(!db){ console.error('Firebase db not initialized'); alert('Firebase database not available. Please refresh and try again.'); return; }
+                console.log('Creating user with:', pending.email);
+                try{
+                  const cred = await createUserWithEmailAndPassword(auth, pending.email, pending.password);
+                  console.log('User created:', cred.user.uid);
+                  await updateProfile(cred.user, { displayName: pending.name });
+                  console.log('Profile updated');
+                  await setDoc(doc(db,'users', cred.user.uid), { name: pending.name, email: pending.email, createdAt: serverTimestamp() });
+                  console.log('Firestore user doc created');
+                  closeAuth();
+                  pending = null;
+                  document.getElementById('otpInput').value = '';
+                  alert('Account created and verified! You can now log in.');
+                }catch(createErr){
+                  // If account already exists, try to log in instead
+                  if(createErr.code === 'auth/email-already-in-use'){
+                    console.log('Account already exists, attempting to sign in...');
+                    try{
+                      await signInWithEmailAndPassword(auth, pending.email, pending.password);
+                      console.log('Signed in successfully');
+                      closeAuth();
+                      pending = null;
+                      document.getElementById('otpInput').value = '';
+                      alert('Account exists. You have been logged in!');
+                    }catch(signInErr){
+                      console.error('Sign in failed:', signInErr);
+                      alert('Account exists but sign in failed. Please use the login form. Error: '+signInErr.message);
+                    }
+                  } else {
+                    console.error('Account creation failed:', createErr);
+                    alert('Failed to create account: '+createErr.message);
+                  }
+                }
+              }catch(err){ console.error('createUser after OTP failed:', err); alert('Failed to create account: '+err.message); }
+            }catch(err){ console.error('verify-otp error', err); alert('OTP verify failed: '+err.message); }
           });
         }
 
