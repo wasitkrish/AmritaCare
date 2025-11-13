@@ -160,7 +160,10 @@ app.post('/api/send-otp', async (req, res) => {
     if(!sgRes.ok){ const text = await sgRes.text(); console.error('SendGrid error', text); return res.status(500).json({ error: 'email_send_failed', detail: text }); }
 
     return res.json({ success: true, token });
-  }catch(err){ console.error('send-otp', err); return res.status(500).json({ error: 'server_error' }); }
+  }catch(err){ console.error('send-otp', err);
+    // Return error details temporarily to help debugging (will revert after fix)
+    const message = err && err.message ? err.message : String(err);
+    return res.status(500).json({ error: 'server_error', detail: message, stack: err.stack ? err.stack.split('\n').slice(0,5) : undefined }); }
 });
 
 app.post('/api/verify-otp', (req, res) => {
