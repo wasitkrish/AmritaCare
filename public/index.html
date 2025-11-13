@@ -2650,21 +2650,57 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       }catch(e){ console.warn('fallback dom append failed', e); }
     }
 
+    function showChatNotice(text, actionLabel, actionFn){
+      try{
+        let n = document.getElementById('chatSendNotice');
+        if(!n){
+          n = document.createElement('div'); n.id = 'chatSendNotice';
+          n.style.position = 'fixed'; n.style.right = '12px'; n.style.bottom = '72px'; n.style.zIndex = 10001;
+          n.style.background = '#fffaf0'; n.style.border = '1px solid #ffe4b5'; n.style.padding = '8px 12px'; n.style.borderRadius = '8px';
+          n.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; n.style.color = '#7a4a00';
+          document.body.appendChild(n);
+        }
+        n.innerHTML = '';
+        const span = document.createElement('span'); span.textContent = text; n.appendChild(span);
+        if(actionLabel && actionFn){ const btn = document.createElement('button'); btn.textContent = actionLabel; btn.style.marginLeft='8px'; btn.className='px-2 py-1 rounded bg-indigo-600 text-white'; btn.onclick = actionFn; n.appendChild(btn); }
+        setTimeout(()=>{ try{ n.remove(); }catch(e){} }, 7000);
+      }catch(e){ console.warn('showChatNotice failed', e); }
+    }
+
     async function fallbackSend(){
       try{
         const input = document.getElementById('messageInput'); if(!input) return;
         const txt = (input.value||'').trim(); if(!txt) return;
         const eff = (typeof getEffectiveUser === 'function') ? getEffectiveUser() : null;
-        const msg = { from: eff && eff.name ? eff.name : 'Anonymous', email: eff && eff.email ? eff.email : 'anonymous@local', text: txt, ts: new Date().toLocaleTimeString(), timestamp: Date.now() };
-        // For Firestore-only chat, require Firebase to be available and user signed-in
-        if(!(window._firebase && window._firebase.auth && window._firebase.auth.currentUser && typeof window.sendChatMessage === 'function')){
-          alert('Realtime chat requires Firebase sign-in. Please sign in to send messages.');
-          return;
+        const msg = { from: eff && eff.name ? eff.name : (eff && eff.email ? eff.email.split('@')[0] : 'Anonymous'), email: eff && eff.email ? eff.email : 'anonymous@local', text: txt, ts: new Date().toLocaleTimeString(), timestamp: Date.now() };
+
+        // Prefer Firebase send when signed-in
+        if(window._firebase && window._firebase.auth && window._firebase.auth.currentUser && typeof window.sendChatMessage === 'function'){
+          const inputEl = document.getElementById('messageInput'); if(inputEl) inputEl.value = msg.text;
+          try{ await window.sendChatMessage(); if(inputEl) inputEl.value = ''; return; }catch(e){ console.warn('Firebase send failed, falling back to server:', e); }
         }
-        // Delegate to Firebase-backed sender
-        const inputEl = document.getElementById('messageInput'); if(inputEl) inputEl.value = msg.text;
-        try{ await window.sendChatMessage(); }catch(e){ console.error('Firebase send failed', e); alert('Failed to send message via Firebase. See console for details.'); }
-        if(inputEl) inputEl.value = '';
+
+        // Try server fallback: POST to /api/messages
+        // Optimistic UI: append to window.chatMessages and render
+        window.chatMessages = window.chatMessages || [];
+        const localMsg = Object.assign({}, msg, { id: 'local_' + Date.now() });
+        window.chatMessages.push(localMsg);
+        if(window.chatMessages.length > 30) window.chatMessages = window.chatMessages.slice(-30);
+        renderChatMessages();
+        input.value = '';
+
+        try{
+          const resp = await fetch('/api/messages', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(msg) });
+          if(resp && resp.ok){ const j = await resp.json(); if(j && j.success && j.id){ // update id
+              localMsg.id = j.id;
+            }
+            showChatNotice('Message saved via server fallback.');
+            return;
+          }
+          showChatNotice('Server persist failed. Message shown locally.');
+        }catch(e){ console.warn('Server fallback POST failed', e); showChatNotice('Server persist failed (offline).'); }
+
+        // If server also not available, keep optimistic UI until Firestore becomes available
       }catch(e){ console.error('fallbackSend error', e); }
     }
 
