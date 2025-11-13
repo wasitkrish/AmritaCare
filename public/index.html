@@ -2715,8 +2715,20 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
         // reverse to show oldest first
         msgs.reverse();
         window.chatMessages = msgs;
+        // clear any status message
+        try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
         renderChatMessages();
-    }, err=> console.error('chat listener',err));
+    }, err=> {
+      console.error('chat listener',err);
+      try{
+        const s = document.getElementById('chatStatus') || (function(){ const el = document.createElement('div'); el.id='chatStatus'; el.style.padding='8px'; el.style.background='#fff3cd'; el.style.color='#856404'; el.style.border='1px solid #ffeeba'; el.style.borderRadius='6px'; el.style.position='fixed'; el.style.right='12px'; el.style.bottom='12px'; el.style.zIndex=9999; document.body.appendChild(el); return el; })();
+        s.textContent = 'Firestore chat listener error: ' + (err && err.message ? err.message : String(err)) + ' — check Firestore rules/permissions.';
+      }catch(e2){ console.warn('Failed to render chat status', e2); }
+      // fallback: stop listener and rely on local messages
+      if(unsubscribeChats){ unsubscribeChats(); unsubscribeChats = null; }
+      window.chatMessages = window.chatMessages || JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
+      renderChatMessages();
+    });
   }
 
   function stopChatListener(){ if(unsubscribeChats){ unsubscribeChats(); unsubscribeChats = null; } }
@@ -2836,7 +2848,7 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       try{ const ud = await getDoc(doc(db,'users', user.uid)); if(ud.exists() && ud.data().name) name = ud.data().name; }catch(e){}
       setCurrentUser({ uid: user.uid, email: user.email, name });
       // start listeners
-      startChatListener();
+      try{ startChatListener(); }catch(e){ console.error('startChatListener threw', e); }
       // show clear button (should be hidden since not admin, but keep for future)
       const clearChatBtn = document.getElementById('clearChatBtn');
       if(clearChatBtn){ clearChatBtn.classList.add('hidden'); }
@@ -2846,6 +2858,11 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       stopChatListener(); stopReportsListener();
     }
   });
+
+  // Also attempt to start chat listener immediately so public/unauthenticated users can see messages
+  try{
+    startChatListener();
+  }catch(e){ console.warn('Immediate startChatListener attempt failed:', e); }
 
   // replace login/signup behavior to use Firebase (override previous handlers)
   try{
