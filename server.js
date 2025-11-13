@@ -187,6 +187,15 @@ app.post('/api/verify-otp', (req, res) => {
   }catch(err){ console.error('verify-otp', err); return res.status(500).json({ error: 'server_error' }); }
 });
 
+// Debug endpoint to check configured SENDGRID_FROM (auth required)
+app.get('/api/debug-sendgrid-from', (req, res) => {
+  const token = req.headers['x-debug-token'] || req.query.token;
+  const secret = process.env.ADMIN_MANAGE_TOKEN || process.env.OTP_SECRET;
+  if (!token || !secret || token !== secret) return res.status(403).json({ error: 'forbidden' });
+  const from = process.env.SENDGRID_FROM || process.env.VITE_FORMSUBMIT_EMAIL || null;
+  return res.json({ sendgrid_from: from });
+});
+
 // Serve SPA fallback
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
