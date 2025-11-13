@@ -1060,16 +1060,6 @@ function setCurrentUser(u){
   try{ updateAdminUI(); }catch(e){}
 }
 function getCurrentUser(){ try{ return JSON.parse(sessionStorage.getItem('mh_current')||'null'); }catch(e){ return null; } }
-// Returns the effective logged-in user (Firebase user if present, otherwise sessionStorage user)
-function getEffectiveUser(){
-  try{
-    if(window._firebase && window._firebase.auth && window._firebase.auth.currentUser){
-      const fbUser = window._firebase.auth.currentUser;
-      return { uid: fbUser.uid, email: fbUser.email, name: fbUser.displayName || (fbUser.email||'').split('@')[0] };
-    }
-    return JSON.parse(sessionStorage.getItem('mh_current')||'null');
-  }catch(e){ return null; }
-}
 function logout(showAlert){ 
   sessionStorage.removeItem('mh_current'); 
   document.getElementById('profileBtn').classList.add('hidden'); 
@@ -1081,7 +1071,7 @@ function logout(showAlert){
 
 /* --- UI gating: enable/disable sections based on login state --- */
 function updateAuthGates(){
-  const user = getEffectiveUser();
+  const user = getCurrentUser();
   const logged = !!user;
   console.log('[DEBUG] updateAuthGates - session user:', user, 'firebaseUser:', (window._firebase && window._firebase.auth && window._firebase.auth.currentUser) || null);
 
@@ -1089,11 +1079,11 @@ function updateAuthGates(){
   const messageInput = document.getElementById('messageInput');
   const sendBtn = document.getElementById('sendBtn');
   const clearChatBtn = document.getElementById('clearChatBtn');
-      if(messageInput){
+  if(messageInput){
     messageInput.placeholder = logged ? 'Type a message...' : 'Login to send messages';
     // focus/click should prompt login when not logged
     if(!messageInput._authInterceptor){
-      messageInput.addEventListener('focus', ()=>{ if(!getEffectiveUser()) openAuth('login'); });
+      messageInput.addEventListener('focus', ()=>{ if(!getCurrentUser()) openAuth('login'); });
       messageInput._authInterceptor = true;
     }
   }
@@ -1101,7 +1091,7 @@ function updateAuthGates(){
   function addClickInterceptor(el){
     if(!el || el._authClickInterceptor) return;
     el.addEventListener('click', (e)=>{
-      if(!getEffectiveUser()){
+      if(!getCurrentUser()){
         e.preventDefault();
         openAuth('login');
       }
@@ -1115,8 +1105,8 @@ function updateAuthGates(){
   if(clearChatBtn){
     clearChatBtn.title = logged ? '' : 'Login to clear messages';
     // if logged in, ensure clearAllChats still works
-      if(!clearChatBtn._clearHandler){
-      clearChatBtn.addEventListener('click', (e)=>{ if(getEffectiveUser()){ clearAllChats(); } });
+    if(!clearChatBtn._clearHandler){
+      clearChatBtn.addEventListener('click', (e)=>{ if(getCurrentUser()){ clearAllChats(); } });
       clearChatBtn._clearHandler = true;
     }
     addClickInterceptor(clearChatBtn);
@@ -1130,14 +1120,14 @@ function updateAuthGates(){
   if(shareMessage) {
     // focusing while logged out prompts login
     if(!shareMessage._authInterceptor){
-      shareMessage.addEventListener('focus', ()=>{ if(!getEffectiveUser()) openAuth('login'); });
+      shareMessage.addEventListener('focus', ()=>{ if(!getCurrentUser()) openAuth('login'); });
       shareMessage._authInterceptor = true;
     }
   }
   if(shareFile){
     // clicking file chooser should prompt login when not logged
     if(!uploadLabel._authInterceptor){
-      uploadLabel.addEventListener('click', (e)=>{ if(!getEffectiveUser()){ e.preventDefault(); openAuth('login'); } });
+      uploadLabel.addEventListener('click', (e)=>{ if(!getCurrentUser()){ e.preventDefault(); openAuth('login'); } });
       uploadLabel._authInterceptor = true;
     }
   }
@@ -1153,18 +1143,15 @@ function updateAuthGates(){
     
     // Function to update contact form with user info
     function updateContactFormWithUser(){
-    const user = getEffectiveUser();
+      const user = getCurrentUser() || (window._firebase && window._firebase.auth && window._firebase.auth.currentUser);
       if(user && user.email){
         emailInput.value = user.email;
-        // Make the email readonly (included in FormData) instead of disabled (which is omitted)
-        emailInput.readOnly = true;
-        emailInput.disabled = false;
-        emailInput.style.opacity = '0.85';
+        emailInput.disabled = true;
+        emailInput.style.opacity = '0.7';
         emailInput.style.cursor = 'not-allowed';
         emailInput.title = 'Email locked from your logged-in account';
       } else {
         emailInput.value = '';
-        emailInput.readOnly = false;
         emailInput.disabled = false;
         emailInput.style.opacity = '';
         emailInput.style.cursor = '';
@@ -1183,9 +1170,20 @@ function updateAuthGates(){
     window.addEventListener('logoutSuccess', updateContactFormWithUser);
     
     // Intercept submit button
-    // Allow contact form submissions from both logged-in and anonymous users.
-    // If logged-in, the email field is prefilled and locked; otherwise the user can submit normally.
-    // (Do not block submit to allow FormSubmit and non-logged users to reach out.)
+    Array.from(contactForm.elements).forEach(el=>{
+      const tag = el.tagName;
+      if(tag === 'BUTTON' && el.type === 'submit'){
+        if(!el._authSubmitInterceptor){
+          el.addEventListener('click', (e)=>{ 
+            if(!getCurrentUser()){ 
+              e.preventDefault(); 
+              openAuth('login'); 
+            } 
+          });
+          el._authSubmitInterceptor = true;
+        }
+      }
+    });
   }
 }
 
@@ -1411,60 +1409,42 @@ closeProfile.addEventListener('click', ()=> profileOverlay.classList.add('hidden
 logoutBtn.addEventListener('click', async ()=> { try{ if(window._firebase && window._firebase.auth){ await window._firebase.auth.signOut(); } }catch(e){} logout(true); profileOverlay.classList.add('hidden'); });
 
 updateNameBtn.addEventListener('click', ()=>{
-  (async ()=>{
-    const u = getEffectiveUser(); 
-    if(!u) return alert('❌ No user logged in');
-
-    const newName = profileName.value.trim(); 
-    if(!newName || newName.length < 2) {
-      alert('❌ Please enter a valid name (at least 2 characters)');
-      return;
-    }
-
-    // If Firebase is enabled, use server OTP flow and Firebase profile update
-    if(window._useFirebaseAuth && window._firebase){
-      try{
-        // Request OTP from server
-        const r = await fetch('/api/send-otp', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ name: newName, email: u.email }) });
-        const j = await r.json();
-        if(!r.ok){ console.error('send-otp failed', j); alert('Failed to send OTP: '+(j.error||j.detail||'server error')); return; }
-        const token = j.token;
-        const code = prompt(`📨 OTP sent to ${u.email}\n\nEnter OTP to confirm name change:`);
-        if(!code) return;
-        const v = await fetch('/api/verify-otp', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ token, otp: code }) });
-        const vj = await v.json();
-        if(!v.ok){ console.error('verify-otp failed', vj); alert('OTP verification failed'); return; }
-
-        // Reauthenticate is optional for profile update; update Firebase profile and users doc
-        try{
-          const auth = window._firebase.auth; const db = window._firebase.db;
-          // dynamic import to get updateProfile and setDoc
-          const { updateProfile } = await import('https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js');
-          const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js');
-          await updateProfile(auth.currentUser, { displayName: newName });
-          await setDoc(doc(db,'users', auth.currentUser.uid), { name: newName, email: auth.currentUser.email, otpVerified: true }, { merge: true });
-          setCurrentUser({ uid: auth.currentUser.uid, email: auth.currentUser.email, name: newName });
-          alert('✅ Name updated successfully!');
-        }catch(e){ console.error('Firebase profile update failed', e); alert('Failed to update profile'); }
-      }catch(e){ console.error('Name change flow error', e); alert('Name change failed'); }
-      return;
-    }
-
-    // Fallback: local OTP flow
-    const otp = generateOTP();
-    storeOTP(u.email, otp);
-    const code = prompt(`📨 OTP sent to ${u.email}\n\nSimulated OTP: ${otp}\n\nEnter OTP to confirm name change:`);
-    if(!code) return;
-    const result = verifyOTP(u.email, code);
-    if(!result.valid){ alert(`❌ ${result.message}`); return; }
-    const accs = loadAccounts(); 
-    const idx = accs.findIndex(a=>a.email===u.email); 
-    if(idx>=0){ accs[idx].name = newName; saveAccounts(accs); setCurrentUser(accs[idx]); alert('✅ Name updated successfully!'); }
-  })();
+  const u = getCurrentUser(); 
+  if(!u) return alert('❌ No user logged in');
+  
+  const newName = profileName.value.trim(); 
+  if(!newName || newName.length < 2) {
+    alert('❌ Please enter a valid name (at least 2 characters)');
+    return;
+  }
+  
+  // Generate OTP for name change
+  const otp = generateOTP();
+  storeOTP(u.email, otp);
+  const code = prompt(`📨 OTP sent to ${u.email}\n\nSimulated OTP: ${otp}\n\nEnter OTP to confirm name change:`);
+  
+  if(!code){
+    return;
+  }
+  
+  const result = verifyOTP(u.email, code);
+  if(!result.valid){
+    alert(`❌ ${result.message}`);
+    return;
+  }
+  
+  const accs = loadAccounts(); 
+  const idx = accs.findIndex(a=>a.email===u.email); 
+  if(idx>=0){ 
+    accs[idx].name = newName; 
+    saveAccounts(accs); 
+    setCurrentUser(accs[idx]); 
+    alert('✅ Name updated successfully!');
+  }
 });
 
 changePasswordBtn.addEventListener('click', ()=>{
-  const u = getEffectiveUser(); 
+  const u = getCurrentUser(); 
   if(!u) return alert('❌ No user logged in');
   
   const currentPwd = prompt('Enter your current password:');
@@ -1509,7 +1489,7 @@ changePasswordBtn.addEventListener('click', ()=>{
 
 /* restore session on load */
 window.addEventListener('load', ()=>{ 
-  const cur = getEffectiveUser(); 
+  const cur = getCurrentUser(); 
   if(cur){ 
     document.getElementById('loginBtn').classList.add('hidden'); 
     profileBtn.classList.remove('hidden'); 
@@ -1817,8 +1797,15 @@ shareFileInput.addEventListener('change', e=> {
 
 /* SHARE EXPERIENCE */
 document.getElementById('shareSend').addEventListener('click', async ()=> { 
-  // Use unified effective user (Firebase or session) to decide login state
-  const user = getEffectiveUser();
+  // Check Firebase auth first, then fall back to sessionStorage user
+  let user = null;
+  if(window._firebase && window._firebase.auth && window._firebase.auth.currentUser){
+    const fbUser = window._firebase.auth.currentUser;
+    user = { uid: fbUser.uid, email: fbUser.email, name: fbUser.displayName || fbUser.email.split('@')[0] };
+  } else {
+    user = getCurrentUser();
+  }
+  
   if(!user){
     alert('Please login to share your experience');
     openAuth('login');
@@ -1881,39 +1868,16 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
 
 // Helper: upload file to Cloudinary using server-signed signature
 async function uploadFileToCloudinarySigned(file){
-  // First, check server config to see if unsigned upload preset is available
-  const cfgResp = await fetch('/api/cloudinary-config');
-  if(!cfgResp.ok) throw new Error('Cloudinary config request failed');
-  const cfg = await cfgResp.json();
-  const cloudName = cfg.cloud_name;
-  const uploadPreset = cfg.upload_preset;
-  const resourceType = (file && file.type && file.type.startsWith('video')) ? 'video' : 'image';
-  const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
-
-  // If upload_preset is provided, perform an unsigned upload (no signature required)
-  if(uploadPreset){
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', url);
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('upload_preset', uploadPreset);
-      fd.append('transformation', JSON.stringify([{ width: 1600, crop: 'limit' }]));
-
-      xhr.upload.onprogress = function(e){ if(e.lengthComputable){ const pct = Math.round((e.loaded / e.total) * 100); fileNameEl.textContent = `Uploading: ${pct}%`; } };
-      xhr.onload = function(){ if(xhr.status >= 200 && xhr.status < 300){ try{ const resp = JSON.parse(xhr.responseText); resolve(resp); }catch(e){ resolve({ url: xhr.responseText }); } } else { reject(new Error('Unsigned upload failed: ' + xhr.statusText)); } };
-      xhr.onerror = function(){ reject(new Error('Upload network error')); };
-      xhr.send(fd);
-    });
-  }
-
-  // Otherwise request server-signed params and perform signed upload
-  const sigResp = await fetch('/api/cloudinary-sign', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ filename: file.name, resourceType }) });
+  // Request signature from our server
+  const sigResp = await fetch('/api/cloudinary-sign', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ filename: file.name }) });
   if(!sigResp.ok) throw new Error('Signature request failed');
   const sigData = await sigResp.json();
+  const cloudName = sigData.cloud_name;
   const apiKey = sigData.api_key;
   const timestamp = sigData.timestamp;
   const signature = sigData.signature;
+
+  const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -1923,10 +1887,25 @@ async function uploadFileToCloudinarySigned(file){
     fd.append('api_key', apiKey);
     fd.append('timestamp', timestamp);
     fd.append('signature', signature);
+    // Optional: transformations
     fd.append('transformation', JSON.stringify([{ width: 1600, crop: 'limit' }]));
 
-    xhr.upload.onprogress = function(e){ if(e.lengthComputable){ const pct = Math.round((e.loaded / e.total) * 100); fileNameEl.textContent = `Uploading: ${pct}%`; } };
-    xhr.onload = function(){ if(xhr.status >= 200 && xhr.status < 300){ try{ const resp = JSON.parse(xhr.responseText); resolve(resp); }catch(e){ resolve({ url: xhr.responseText }); } } else { reject(new Error('Upload failed: ' + xhr.statusText)); } };
+    xhr.upload.onprogress = function(e){
+      if(e.lengthComputable){
+        const pct = Math.round((e.loaded / e.total) * 100);
+        // show minimal feedback
+        fileNameEl.textContent = `Uploading: ${pct}%`;
+      }
+    };
+
+    xhr.onload = function(){
+      if(xhr.status >= 200 && xhr.status < 300){
+        try{ const resp = JSON.parse(xhr.responseText); resolve(resp); }catch(e){ reject(e); }
+      } else {
+        reject(new Error('Upload failed: ' + xhr.statusText));
+      }
+    };
+
     xhr.onerror = function(){ reject(new Error('Upload network error')); };
     xhr.send(fd);
   });
@@ -1935,13 +1914,7 @@ async function uploadFileToCloudinarySigned(file){
 /* CONTACT FORM */
 document.getElementById('contactForm').addEventListener('submit', e=> { 
   e.preventDefault();
-
-  // Block anonymous users from submitting the contact form; prompt login/signup
-  if(!getEffectiveUser()){
-    openAuth('login');
-    return;
-  }
-
+  
   const formData = new FormData(e.target);
   const name = formData.get('name').trim();
   const email = formData.get('email').trim().toLowerCase();
@@ -1953,10 +1926,9 @@ document.getElementById('contactForm').addEventListener('submit', e=> {
     return;
   }
   
-  // Basic email format validation (allow non-institutional emails for contact form)
-  function isValidEmailAddress(e){ try{ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(e).toLowerCase()); }catch(_) { return false; } }
-  if(!isValidEmailAddress(email)){
-    alert('❌ Please enter a valid email address');
+  // Validate institutional email
+  if(!validateInstitutionalEmail(email)){
+    alert(`❌ Invalid email format.\n\nPlease use your institutional email: @${INSTITUTIONAL_EMAIL_DOMAIN}\n\nExample: yourname@${INSTITUTIONAL_EMAIL_DOMAIN}`);
     return;
   }
   
@@ -2027,16 +1999,13 @@ function renderChatMessages(){
   const w = document.getElementById('chatWindow');
   w.innerHTML = '';
 
-  // Prefer Firebase-backed messages if available
-  const msgs = (window.chatMessages && Array.isArray(window.chatMessages)) ? window.chatMessages : chatMessages;
-
-  if(msgs.length === 0){
+  if(chatMessages.length === 0){
     w.innerHTML = '<div class="text-center text-sm muted py-8">No messages yet. Start the conversation!</div>';
     return;
   }
 
-  msgs.forEach(msg => {
-    const user = getEffectiveUser();
+  chatMessages.forEach(msg => {
+    const user = getCurrentUser();
     const isOwn = user && msg.email === user.email;
     const reported = msg.reported || false;
 
@@ -2092,11 +2061,11 @@ function renderChatMessages(){
   });
 
   // Attach report handlers
-    Array.from(w.querySelectorAll('.report-btn')).forEach(b=>{
+  Array.from(w.querySelectorAll('.report-btn')).forEach(b=>{
     b.addEventListener('click', (e)=>{
       e.preventDefault();
       const id = b.dataset.id;
-      if(!getEffectiveUser()){ openAuth('login'); return; }
+      if(!getCurrentUser()){ openAuth('login'); return; }
       reportChat(id);
     });
   });
@@ -2119,8 +2088,8 @@ const messageInput = document.getElementById('messageInput');
 const clearChatBtn = document.getElementById('clearChatBtn');
 
 sendBtn.addEventListener('click', ()=>{
-  // Prefer Firestore-backed send when user is signed in with Firebase; otherwise use local send
-  if(window.sendChatMessage && window._firebase && window._firebase.auth && window._firebase.auth.currentUser){
+  // Call window.sendChatMessage so it uses Firebase override if available
+  if(window.sendChatMessage){
     window.sendChatMessage();
   } else {
     sendChatMessage();
@@ -2167,8 +2136,8 @@ clearChatBtn.addEventListener('click', async ()=>{
 messageInput.addEventListener('keypress', (e)=>{
   if(e.key === 'Enter' && !e.shiftKey){
     e.preventDefault();
-    // Prefer Firestore-backed send when user is signed in with Firebase; otherwise use local send
-    if(window.sendChatMessage && window._firebase && window._firebase.auth && window._firebase.auth.currentUser){
+    // Call window.sendChatMessage so it uses Firebase override if available
+    if(window.sendChatMessage){
       window.sendChatMessage();
     } else {
       sendChatMessage();
@@ -2177,10 +2146,15 @@ messageInput.addEventListener('keypress', (e)=>{
 });
 
 function sendChatMessage(){
-  // Check effective user (Firebase or sessionStorage)
-  const eff = getEffectiveUser();
-  console.log('[DEBUG] sendChatMessage - effective user:', eff);
-  let user = eff;
+  // Check Firebase auth first, then fall back to sessionStorage user
+  console.log('[DEBUG] sendChatMessage - pre-check firebase:', (window._firebase && window._firebase.auth && window._firebase.auth.currentUser) || null, 'session:', getCurrentUser());
+  let user = null;
+  if(window._firebase && window._firebase.auth && window._firebase.auth.currentUser){
+    const fbUser = window._firebase.auth.currentUser;
+    user = { uid: fbUser.uid, email: fbUser.email, name: fbUser.displayName || fbUser.email.split('@')[0] };
+  } else {
+    user = getCurrentUser();
+  }
   
   if(!user){ 
     alert('Please login to send messages');
@@ -2217,10 +2191,6 @@ function sendChatMessage(){
   
   saveChatMessage(msg);
   messageInput.value = '';
-  // Attempt to persist to server messages API so other instances can read it (best-effort)
-  try{
-    fetch('/api/messages', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(msg) }).then(r=>{ /* ignore result */ }).catch(e=>{ console.debug('Server message persist failed', e); });
-  }catch(e){ /* ignore */ }
   
   // Simulate receiving a response (optional - can be removed)
   setTimeout(() => {
@@ -2262,7 +2232,7 @@ function sendChatMessage(){
     b.addEventListener('click', (ev)=>{
       ev.preventDefault();
       // require login to insert
-      if(!getEffectiveUser()){ openAuth('login'); return; }
+      if(!getCurrentUser()){ openAuth('login'); return; }
       insertAtCursor(input, e);
       emojiPicker.classList.add('hidden');
       input.focus();
@@ -2272,12 +2242,49 @@ function sendChatMessage(){
 
   emojiBtn.addEventListener('click', (e)=>{
     e.stopPropagation();
-    if(!getEffectiveUser()){ openAuth('login'); return; }
+    if(!getCurrentUser()){ openAuth('login'); return; }
     emojiPicker.classList.toggle('hidden');
   });
-  // close emoji picker when clicking outside
+
+  // close when clicking outside
   document.addEventListener('click', ()=>{ emojiPicker.classList.add('hidden'); });
   emojiPicker.addEventListener('click', (e)=> e.stopPropagation());
+
+  function insertAtCursor(field, value){
+    try{
+      const start = field.selectionStart || 0;
+      const end = field.selectionEnd || 0;
+      const text = field.value || '';
+      field.value = text.slice(0,start) + value + text.slice(end);
+      const pos = start + value.length;
+      field.selectionStart = field.selectionEnd = pos;
+    }catch(e){ field.value = (field.value || '') + value; }
+  }
+})();
+
+/* ----------------- Reporting / Admin / Banning ----------------- */
+function getAdmins(){
+  try{ const a = JSON.parse(localStorage.getItem(ADMINS_STORAGE_KEY) || 'null'); return Array.isArray(a) && a.length ? a : DEFAULT_ADMINS.slice(); }catch(e){ return DEFAULT_ADMINS.slice(); }
+}
+function isAdmin(email){ if(!email) return false; return getAdmins().includes(email.toLowerCase()); }
+
+function getBanned(){ try{ return JSON.parse(localStorage.getItem(BANNED_STORAGE_KEY) || '[]'); }catch(e){ return []; } }
+function isBanned(email){ const b = getBanned(); return b.includes((email||'').toLowerCase()); }
+function addBan(email){ if(!email) return; const b = getBanned(); if(!b.includes(email.toLowerCase())){ b.push(email.toLowerCase()); localStorage.setItem(BANNED_STORAGE_KEY, JSON.stringify(b)); } }
+
+function reportChat(msgId){
+  const msg = chatMessages.find(m=>m.id===msgId);
+  if(!msg) return alert('Message not found');
+  // mark in chatMessages
+  msg.reported = true;
+  // store report
+  const reports = JSON.parse(localStorage.getItem(REPORTS_STORAGE_KEY) || '[]');
+  reports.push({ id: 'r_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), msgId: msg.id, text: msg.text, from: msg.from, email: msg.email, ts: msg.ts, reportedAt: Date.now() });
+  localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
+  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
+  renderChatMessages();
+  alert('✅ Message reported. Admins will review it.');
+}
 
 function loadReportedChats(){
   try{ return JSON.parse(localStorage.getItem(REPORTS_STORAGE_KEY) || '[]'); }catch(e){ return []; }
@@ -2326,7 +2333,7 @@ function renderAdminContent(){
     let reports = loadReportedChats(); reports = reports.filter(r=>r.email !== email); localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
     renderAdminContent(); renderChatMessages();
     // if banned user is currently logged in, log them out
-    const cur = getEffectiveUser(); if(cur && cur.email === email){ logout(); alert('Banned user was logged out.'); }
+    const cur = getCurrentUser(); if(cur && cur.email === email){ logout(); alert('Banned user was logged out.'); }
   }));
   Array.from(container.querySelectorAll('.admin-dismiss')).forEach(b=> b.addEventListener('click', ()=>{
     const reportId = b.dataset.report; let reports = loadReportedChats(); reports = reports.filter(r=>r.id!==reportId); localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports)); renderAdminContent();
@@ -2334,7 +2341,7 @@ function renderAdminContent(){
 }
 
 function updateAdminUI(){
-  const cur = getEffectiveUser();
+  const cur = getCurrentUser();
   const openAdminBtn = document.getElementById('openAdminBtn');
   const adminOverlay = document.getElementById('adminOverlay');
   if(openAdminBtn){

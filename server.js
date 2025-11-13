@@ -29,56 +29,31 @@ app.get("/api/health", (req, res) => {
 });
 
 /**
- * GPT Chat API - Store & Retrieve User Messages (Real-time user-to-user)
+ * GPT Chat API - in-memory store (robust)
  * POST /api/messages - Save a message
  * GET /api/messages - Get all messages
  */
-app.post("/api/messages", (req, res) => {
-  const { from, email, text, timestamp } = req.body;
+let _chatMessages = [];
+// Try to hydrate from env (best-effort)
+try{ const envMsgs = JSON.parse(process.env.CHAT_MESSAGES || '[]'); if(Array.isArray(envMsgs) && envMsgs.length) _chatMessages = envMsgs.slice(-500); }catch(e){ /* ignore */ }
 
-  if (!from || !email || !text) {
-    return res.status(400).json({ error: "Missing required fields: from, email, text" });
-  }
+app.post('/api/messages', (req, res) => {
+  try{
+    const { from, email, text, timestamp } = req.body || {};
+    if(!from || !email || !text) return res.status(400).json({ error: 'Missing required fields: from, email, text' });
 
-  try {
-    // Store message (in production, use a real database)
-    const messages = JSON.parse(process.env.CHAT_MESSAGES || "[]");
-    messages.push({
-      from,
-      email,
-      text,
-      timestamp: timestamp || Date.now(),
-      ts: new Date().toLocaleTimeString(),
-      id: Date.now()
-    });
-    
-    // Keep last 500 messages in memory
-    if (messages.length > 500) messages.shift();
-    process.env.CHAT_MESSAGES = JSON.stringify(messages);
-
-    res.json({ 
-      success: true, 
-      message: "Message saved",
-      id: Date.now()
-    });
-  } catch (err) {
-    console.error("❌ Error saving message:", err);
-    res.status(500).json({ error: "Failed to save message" });
-  }
+    const msg = { from, email, text, timestamp: timestamp || Date.now(), ts: new Date().toLocaleTimeString(), id: Date.now() };
+    _chatMessages.push(msg);
+    if(_chatMessages.length > 500) _chatMessages = _chatMessages.slice(-500);
+    // best-effort persist to env
+    try{ process.env.CHAT_MESSAGES = JSON.stringify(_chatMessages); }catch(e){ /* ignore */ }
+    return res.json({ success: true, message: 'Message saved', id: msg.id });
+  }catch(err){ console.error('❌ /api/messages POST error', err); return res.status(500).json({ error: 'server_error', detail: err.message }); }
 });
 
-/**
- * Retrieve all chat messages
- * GET /api/messages
- */
-app.get("/api/messages", (req, res) => {
-  try {
-    const messages = JSON.parse(process.env.CHAT_MESSAGES || "[]");
-    res.json({ success: true, messages, count: messages.length });
-  } catch (err) {
-    console.error("❌ Error retrieving messages:", err);
-    res.json({ success: true, messages: [], count: 0 });
-  }
+app.get('/api/messages', (req, res) => {
+  try{ return res.json({ success: true, messages: _chatMessages.slice(-30), count: _chatMessages.length }); }
+  catch(err){ console.error('❌ /api/messages GET error', err); return res.status(500).json({ success: false, messages: [], count: 0 }); }
 });
 
 /**
@@ -233,6 +208,38 @@ app.post('/api/verify-otp', (req, res) => {
 
     return res.json({ success: true, email: payload.email });
   }catch(err){ console.error('verify-otp', err); return res.status(500).json({ error: 'server_error' }); }
+});
+
+// Contact endpoint: send contact messages via SendGrid or Gmail fallback
+app.post('/api/contact', async (req, res) => {
+  try{
+    const { name, email, message } = req.body || {};
+    if(!email || !message) return res.status(400).json({ error: 'missing_fields' });
+
+    const sendgridKey = (process.env.SENDGRID_API_KEY || '').trim();
+    const fromEmail = (process.env.SENDGRID_FROM || process.env.VITE_FORMSUBMIT_EMAIL || '').trim();
+
+    if(sendgridKey && fromEmail){
+      // Send via SendGrid
+      const msg = {
+        personalizations: [{ to: [{ email: fromEmail }] }],
+        from: { email },
+        subject: `Contact form: ${name || email}`,
+        content: [{ type: 'text/plain', value: `From: ${name || 'Anonymous'} <${email}>\n\n${message}` }]
+      };
+      try{
+        const sgRes = await fetch('https://api.sendgrid.com/v3/mail/send', { method: 'POST', headers: { 'authorization': `Bearer ${sendgridKey}`, 'content-type':'application/json' }, body: JSON.stringify(msg) });
+        if(sgRes.ok){ return res.json({ success: true, via: 'sendgrid' }); }
+        const txt = await sgRes.text(); console.warn('SendGrid contact failed:', txt);
+      }catch(e){ console.error('SendGrid contact error', e); }
+    }
+
+    // Gmail fallback
+    const gmailOk = await sendViaGmail((process.env.CONTACT_NOTIFY_EMAIL || process.env.SENDGRID_FROM || process.env.VITE_FORMSUBMIT_EMAIL), name || 'Contact', `Message from ${email}:\n\n${message}`);
+    if(gmailOk) return res.json({ success: true, via: 'gmail' });
+
+    return res.status(500).json({ error: 'email_send_failed', detail: 'SendGrid and Gmail both failed or not configured' });
+  }catch(err){ console.error('/api/contact', err); return res.status(500).json({ error: 'server_error' }); }
 });
 
 // Debug endpoint to check configured SENDGRID_FROM (auth required)
