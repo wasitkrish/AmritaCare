@@ -191,8 +191,11 @@ app.post('/api/verify-otp', (req, res) => {
 app.get('/api/debug-sendgrid-from', (req, res) => {
   const token = req.headers['x-debug-token'] || req.query.token;
   const secret = process.env.ADMIN_MANAGE_TOKEN || process.env.OTP_SECRET;
-  if (!token || !secret || token !== secret) return res.status(403).json({ error: 'forbidden' });
   const from = process.env.SENDGRID_FROM || process.env.VITE_FORMSUBMIT_EMAIL || null;
+  if (!token || !secret || token !== secret) {
+    console.warn('debug-sendgrid-from: unauthenticated access - returning limited info');
+    return res.json({ sendgrid_from: from, note: 'unauthenticated' });
+  }
   return res.json({ sendgrid_from: from });
 });
 
