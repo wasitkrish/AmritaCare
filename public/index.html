@@ -2485,8 +2485,9 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     firebaseConfig = null;
   }
 
-  if (!firebaseConfig) {
-    console.warn('Firebase not configured. Local auth will be used.');
+  // Only use Firebase auth when a real apiKey is present in the config.
+  if (!firebaseConfig || !firebaseConfig.apiKey || (typeof firebaseConfig.apiKey === 'string' && firebaseConfig.apiKey.trim() === '')) {
+    console.warn('Firebase not configured or missing apiKey. Local auth will be used.');
     window._useFirebaseAuth = false;
   } else {
     const app = initializeApp(firebaseConfig);
