@@ -1311,8 +1311,8 @@ loginForm.addEventListener('submit', e=>{ if(window._useFirebaseAuth) return;
   alert('✅ Login successful!');
   closeAuth();
   
-  // Load chat history on login
-  loadChatHistory();
+  // Start Firestore listener (Firestore-only chat)
+  try{ if(typeof startChatListener === 'function') startChatListener(); }catch(e){ console.debug('startChatListener not available on login', e); }
 });
 
 /* SIGNUP SEND OTP */
@@ -1391,8 +1391,8 @@ verifyOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
   setCurrentUser(newAcc);
   closeAuth();
   
-  // Load chat history
-  loadChatHistory();
+  // Start Firestore listener (Firestore-only chat)
+  try{ if(typeof startChatListener === 'function') startChatListener(); }catch(e){ console.debug('startChatListener not available after signup', e); }
 });
 
 resendOtpBtn.addEventListener('click', ()=> { if(window._useFirebaseAuth) return; 
@@ -1597,8 +1597,8 @@ window.addEventListener('load', ()=>{
     document.getElementById('profileEmail').innerText = cur.email; 
     profileName.value = cur.name || ''; 
   }
-  // Load chat history
-  loadChatHistory();
+  // Start Firestore listener (Firestore-only chat)
+  try{ if(typeof startChatListener === 'function') startChatListener(); }catch(e){ console.debug('startChatListener not available at load', e); }
   
   // Add email validation on input
   const signupEmailInput = document.getElementById('signupEmail');
@@ -2081,27 +2081,25 @@ const DEFAULT_ADMINS = ['admin@bl.students.amrita.edu'];
 let chatMessages = [];
 
 function loadChatHistory(){
-  try{
-    chatMessages = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
-    // ensure we only keep last 30 visible messages
-    if(chatMessages.length > 30) chatMessages = chatMessages.slice(-30);
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
-    renderChatMessages();
-  } catch(e){
-    chatMessages = [];
-  }
+  // Chat is Firestore-backed only. Real-time messages are delivered via onSnapshot.
+  // This function is intentionally a no-op to avoid localStorage usage.
+  console.debug('loadChatHistory: noop (Firestore-only chat)');
 }
 
 function saveChatMessage(msg){
-  // add unique id
-  msg.id = msg.id || ('m_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
-  chatMessages.push(msg);
-  // Keep only last 30 messages visible
-  if(chatMessages.length > 30){
-    chatMessages = chatMessages.slice(-30);
-  }
-  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
-  renderChatMessages();
+  // Firestore-only: attempt to send via Firebase if available; otherwise inform user
+  try{
+    // If Firebase is available and user is signed in, use the Firebase send handler
+    if(window._firebase && window._firebase.auth && window._firebase.auth.currentUser && typeof window.sendChatMessage === 'function'){
+      // set input and call the firebase-backed sender
+      const input = document.getElementById('messageInput');
+      if(input){ input.value = msg.text; }
+      try{ window.sendChatMessage(); }catch(e){ console.error('Firebase send failed', e); }
+      return;
+    }
+  }catch(e){ console.warn('saveChatMessage error', e); }
+  // If we reach here, Firestore is not available or user not signed in
+  alert('Chat requires Firebase sign-in. Please sign in to use realtime chat.');
 }
 
 function renderChatMessages(){
@@ -2656,17 +2654,17 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       try{
         const input = document.getElementById('messageInput'); if(!input) return;
         const txt = (input.value||'').trim(); if(!txt) return;
-        // use effective user helper so we support Firebase or session users
         const eff = (typeof getEffectiveUser === 'function') ? getEffectiveUser() : null;
-        const from = eff && eff.name ? eff.name : eff && eff.email ? (eff.email.split('@')[0]) : 'Anonymous';
-        const email = eff && eff.email ? eff.email : 'anonymous@local';
-        const msg = { from, email, text: txt, ts: new Date().toLocaleTimeString(), timestamp: Date.now() };
-        // persist locally (updates localStorage and renders)
-        try{ saveChatMessage(msg); }catch(e){ console.warn('saveChatMessage failed', e); createFallbackMessageDOM(msg); }
-        input.value = '';
-        // try to persist to server (best-effort)
-        try{ await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(msg) }); }
-        catch(e){ console.debug('Fallback persist failed', e); }
+        const msg = { from: eff && eff.name ? eff.name : 'Anonymous', email: eff && eff.email ? eff.email : 'anonymous@local', text: txt, ts: new Date().toLocaleTimeString(), timestamp: Date.now() };
+        // For Firestore-only chat, require Firebase to be available and user signed-in
+        if(!(window._firebase && window._firebase.auth && window._firebase.auth.currentUser && typeof window.sendChatMessage === 'function')){
+          alert('Realtime chat requires Firebase sign-in. Please sign in to send messages.');
+          return;
+        }
+        // Delegate to Firebase-backed sender
+        const inputEl = document.getElementById('messageInput'); if(inputEl) inputEl.value = msg.text;
+        try{ await window.sendChatMessage(); }catch(e){ console.error('Firebase send failed', e); alert('Failed to send message via Firebase. See console for details.'); }
+        if(inputEl) inputEl.value = '';
       }catch(e){ console.error('fallbackSend error', e); }
     }
 
