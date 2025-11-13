@@ -2197,9 +2197,9 @@ const messageInput = document.getElementById('messageInput');
 const clearChatBtn = document.getElementById('clearChatBtn');
 
 sendBtn.addEventListener('click', ()=>{
-  // Prefer Firestore-backed send when user is signed in with Firebase; otherwise use local send
-  if(window.sendChatMessage && window._firebase && window._firebase.auth && window._firebase.auth.currentUser){
-    window.sendChatMessage();
+  // Prefer Firestore-backed send when Firebase override is available; otherwise use local send
+  if(typeof window.sendChatMessage === 'function'){
+    try{ window.sendChatMessage(); }catch(e){ console.error('window.sendChatMessage threw', e); }
   } else {
     sendChatMessage();
   }
@@ -2245,9 +2245,9 @@ clearChatBtn.addEventListener('click', async ()=>{
 messageInput.addEventListener('keypress', (e)=>{
   if(e.key === 'Enter' && !e.shiftKey){
     e.preventDefault();
-    // Prefer Firestore-backed send when user is signed in with Firebase; otherwise use local send
-    if(window.sendChatMessage && window._firebase && window._firebase.auth && window._firebase.auth.currentUser){
-      window.sendChatMessage();
+    // Prefer Firestore-backed send when Firebase override is available; otherwise use local send
+    if(typeof window.sendChatMessage === 'function'){
+      try{ window.sendChatMessage(); }catch(e){ console.error('window.sendChatMessage threw', e); }
     } else {
       sendChatMessage();
     }
@@ -2696,12 +2696,13 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     if(unsubscribeChats) return;
     const q = query(collection(db,'chats'), orderBy('timestamp','desc'), limit(30));
     unsubscribeChats = onSnapshot(q, snap => {
-      const msgs = [];
-      snap.forEach(d => { const data = d.data(); msgs.push({ id: d.id, from: data.from, email: data.email, text: data.text, ts: formatTs(data.timestamp), timestamp: data.timestamp, uid: data.uid, reported: data.reported||false }); });
-      // reverse to show oldest first
-      msgs.reverse();
-      window.chatMessages = msgs;
-      renderChatMessages();
+        console.log('[DEBUG] Firestore chat snapshot received, docs:', snap.size);
+        const msgs = [];
+        snap.forEach(d => { const data = d.data(); msgs.push({ id: d.id, from: data.from, email: data.email, text: data.text, ts: formatTs(data.timestamp), timestamp: data.timestamp, uid: data.uid, reported: data.reported||false }); });
+        // reverse to show oldest first
+        msgs.reverse();
+        window.chatMessages = msgs;
+        renderChatMessages();
     }, err=> console.error('chat listener',err));
   }
 
