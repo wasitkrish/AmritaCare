@@ -1,86 +1,9 @@
 {
-  "logs": [
-    "cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
-    "[DOM] Input elements should have autocomplete attributes (suggested: \"current-password\"): (More info: https://goo.gl/9p2vKq) %o",
-    "[DOM] Input elements should have autocomplete attributes (suggested: \"current-password\"): (More info: https://goo.gl/9p2vKq) %o",
-    "[DEBUG] /api/firebase-config response: JSHandle@object",
-    "[DEBUG] Initializing Firebase with config (masked): JSHandle@object",
-    "[DEBUG] window._firebase set true",
-    "[DEBUG] Initial load: fetching /api/messages for immediate chat display",
-    "[DEBUG] startChatListener - setting up listener on chats collection",
-    "[DEBUG] Initial /api/messages load: 14 messages",
-    "[DEBUG] onAuthStateChanged - user: ",
-    "[DEBUG] updateAuthGates - session user:  firebaseUser: ",
-    "[DEBUG] updateAuthGates - session user:  firebaseUser: ",
-    "Video playing successfully",
-    "cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation",
-    "[DOM] Input elements should have autocomplete attributes (suggested: \"current-password\"): (More info: https://goo.gl/9p2vKq) %o",
-    "[DOM] Input elements should have autocomplete attributes (suggested: \"current-password\"): (More info: https://goo.gl/9p2vKq) %o",
-    "[DEBUG] /api/firebase-config response: JSHandle@object",
-    "[DEBUG] Initializing Firebase with config (masked): JSHandle@object",
-    "[DEBUG] window._firebase set true",
-    "[DEBUG] Initial load: fetching /api/messages for immediate chat display",
-    "[DEBUG] startChatListener - setting up listener on chats collection",
-    "[DEBUG] Initial /api/messages load: 14 messages",
-    "[DEBUG] onAuthStateChanged - user: ",
-    "[DEBUG] updateAuthGates - session user:  firebaseUser: ",
-    "[DEBUG] updateAuthGates - session user:  firebaseUser: ",
-    "Video playing successfully",
-    "[DEBUG] updateAuthGates - session user: JSHandle@object firebaseUser: ",
-    "[DEBUG] sendChatMessage invoked JSHandle@object",
-    "[DEBUG] window.sendChatMessage called, auth.currentUser: ",
-    "[DEBUG] sendChatMessage succeeded",
-    "[DEBUG] sendBtn clicked JSHandle@object"
+  "logs": [],
+  "errors": [
+    "Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000"
   ],
-  "errors": [],
-  "network": [
-    {
-      "type": "response",
-      "url": "http://localhost:3000/api/firebase-config",
-      "status": 304
-    }
-  ],
-  "firebaseInit": {
-    "windowFirebase": true,
-    "hasAuth": true,
-    "hasDb": true,
-    "authInitialized": true,
-    "dbInitialized": true,
-    "useFirebaseAuth": true,
-    "chatMessagesCount": 14
-  },
-  "chatMessages": {
-    "count": 14,
-    "messages": [
-      {
-        "from": "Test User",
-        "email": "test@example.com",
-        "text": "hello from ps",
-        "timestamp": 123,
-        "ts": "7:10:38 PM",
-        "id": 1763041238215
-      },
-      {
-        "from": "LocalTest",
-        "email": "local@test",
-        "text": "hello from local test",
-        "timestamp": 1763061353,
-        "ts": "7:15:53 PM",
-        "id": 1763041553346
-      },
-      {
-        "from": "Headless Bot",
-        "email": "headless@bl.students.amrita.edu",
-        "text": "Headless test message",
-        "timestamp": 1763045895788,
-        "ts": "8:28:15 PM",
-        "id": 1763045895831
-      }
-    ],
-    "chatWindowHTML": "<div class=\"chat-message-other\"><div class=\"chat-avatar\">TU</div><div class=\"chat-content\"><div class=\"chat-header\"><strong>Test User</strong> <span class=\"chat-time\">7:10:38 PM</span></div><div class",
-    "afterSend": {
-      "messages": 15,
-      "html": "<div class=\"chat-message-other\"><div class=\"chat-avatar\">TU</div><div class=\"chat-content\"><div class=\"chat-header\"><strong>Test User</strong> <span class=\"chat-time\">7:10:38 PM</span></div><div class=\"chat-bubble-other\"><div class=\"text-sm\">hello from ps</div></div><div class=\"chat-actions\"><button"
-    }
-  }
+  "network": [],
+  "firebaseInit": null,
+  "chatMessages": null
 }

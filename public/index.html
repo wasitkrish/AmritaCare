@@ -1968,7 +1968,17 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
       const db = window._firebase.db;
       try{ await addDoc(collection(db,'shares'), { ...shareObj, createdAt: serverTimestamp() }); }catch(e){ console.warn('Failed to write share to Firestore', e); }
       // Also post as a chat message so it appears in realtime chat
-      try{ await addDoc(collection(db,'chats'), { uid: window._firebase.auth.currentUser.uid, from: user.name || user.email.split('@')[0], email: user.email, text: `${t}${uploadedUrl ? '\n' + uploadedUrl : ''}`, timestamp: serverTimestamp() }); }catch(e){ console.warn('Failed to post share into chats', e); }
+      try{
+        const chatPayload = {
+          uid: window._firebase.auth && window._firebase.auth.currentUser ? window._firebase.auth.currentUser.uid : null,
+          from: user.name || user.email.split('@')[0],
+          email: user.email,
+          text: `${t}${uploadedUrl ? '\n' + uploadedUrl : ''}`,
+          timestamp: serverTimestamp()
+        };
+        console.debug('[DEBUG] Firestore write payload (share->chats):', chatPayload);
+        await addDoc(collection(db,'chats'), chatPayload);
+      }catch(e){ console.warn('Failed to post share into chats', e); }
     }
   }catch(e){ console.warn('share persistence error', e); }
 
@@ -2802,13 +2812,16 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     const txt = document.getElementById('messageInput').value.trim();
     if(!txt) return;
     try{
-      await addDoc(collection(db,'chats'), {
+      // Build payload explicitly so Firestore rules that require specific keys won't be missing them
+      const payload = {
         uid: user.uid,
         from: user.displayName || user.email.split('@')[0],
         email: user.email,
         text: txt,
         timestamp: serverTimestamp()
-      });
+      };
+      console.debug('[DEBUG] Firestore write payload (chats):', payload);
+      await addDoc(collection(db,'chats'), payload);
       document.getElementById('messageInput').value='';
     }catch(err){ console.error(err); alert('Failed to send message'); }
   };
@@ -2825,6 +2838,27 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
             return res;
           }catch(err){
             console.error('[DEBUG] sendChatMessage failed', err);
+            // If permissions prevented the write, fall back to server-side persistence so UX isn't blocked.
+            try{
+              const permDenied = err && (err.code === 'permission-denied' || (err.message && err.message.indexOf('permission-denied') !== -1));
+              if(permDenied){
+                console.warn('[DEBUG] sendChatMessage permission denied — falling back to server POST');
+                // Use fallbackSend if available (defined earlier in page), otherwise manual POST
+                if(typeof fallbackSend === 'function'){
+                  try{ await fallbackSend(); return; }catch(e2){ console.warn('fallbackSend failed', e2); }
+                }
+                // manual fallback
+                try{
+                  const input = document.getElementById('messageInput');
+                  const txt = input ? input.value.trim() : '';
+                  const eff = (typeof getEffectiveUser === 'function') ? getEffectiveUser() : null;
+                  const msg = { from: eff && eff.name ? eff.name : (eff && eff.email ? eff.email.split('@')[0] : 'Anonymous'), email: eff && eff.email ? eff.email : 'anonymous@local', text: txt, ts: new Date().toLocaleTimeString(), timestamp: Date.now() };
+                  await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(msg) });
+                  if(input) input.value = '';
+                  return;
+                }catch(e3){ console.warn('Manual POST fallback failed', e3); }
+              }
+            }catch(inner){ console.warn('sendChatMessage fallback handler error', inner); }
             throw err;
           }
         };

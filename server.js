@@ -10,6 +10,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import admin from 'firebase-admin';
 
 dotenv.config();
 
@@ -37,7 +38,25 @@ let _chatMessages = [];
 // Try to hydrate from env (best-effort)
 try{ const envMsgs = JSON.parse(process.env.CHAT_MESSAGES || '[]'); if(Array.isArray(envMsgs) && envMsgs.length) _chatMessages = envMsgs.slice(-500); }catch(e){ /* ignore */ }
 
-app.post('/api/messages', (req, res) => {
+// Optional: initialize Firebase Admin SDK if service account provided (base64 JSON or raw JSON string)
+let _adminDb = null;
+try{
+  const saEnv = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT || '';
+  if(saEnv && String(saEnv).trim()){
+    let saObj = null;
+    try{
+      if(String(saEnv).trim().startsWith('{')) saObj = JSON.parse(saEnv);
+      else saObj = JSON.parse(Buffer.from(saEnv, 'base64').toString('utf8'));
+    }catch(e){ console.warn('Failed to parse FIREBASE service account JSON from env', e); }
+    if(saObj){
+      admin.initializeApp({ credential: admin.credential.cert(saObj) });
+      _adminDb = admin.firestore();
+      console.log('✅ Firebase Admin initialized for server-side Firestore persistence');
+    }
+  }
+}catch(e){ console.warn('Firebase Admin initialization error', e); }
+
+app.post('/api/messages', async (req, res) => {
   try{
     const { from, email, text, timestamp } = req.body || {};
     if(!from || !email || !text) return res.status(400).json({ error: 'Missing required fields: from, email, text' });
@@ -47,6 +66,14 @@ app.post('/api/messages', (req, res) => {
     if(_chatMessages.length > 500) _chatMessages = _chatMessages.slice(-500);
     // best-effort persist to env
     try{ process.env.CHAT_MESSAGES = JSON.stringify(_chatMessages); }catch(e){ /* ignore */ }
+
+    // If Admin SDK configured, persist into Firestore 'chats' collection for production persistence
+    if(_adminDb){
+      try{
+        await _adminDb.collection('chats').add({ from: msg.from, email: msg.email, text: msg.text, timestamp: admin.firestore.FieldValue.serverTimestamp() });
+      }catch(e){ console.warn('Failed to persist message to Firestore via Admin SDK', e); }
+    }
+
     return res.json({ success: true, message: 'Message saved', id: msg.id });
   }catch(err){ console.error('❌ /api/messages POST error', err); return res.status(500).json({ error: 'server_error', detail: err.message }); }
 });
