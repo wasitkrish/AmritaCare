@@ -2639,8 +2639,18 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       const bannedSnap = await getDoc(doc(db,'banned', user.uid));
       if(bannedSnap.exists()){
         alert('Your account is banned.'); await signOut(auth); return; }
-      // require email verification
-      if(user && !user.emailVerified){
+      
+      // Check if user has been OTP-verified (flag stored during signup)
+      let hasOtpVerification = false;
+      try{ 
+        const ud = await getDoc(doc(db,'users', user.uid)); 
+        if(ud.exists()) {
+          hasOtpVerification = ud.data().otpVerified || false;
+        }
+      }catch(e){ console.warn('Could not check OTP verification status'); }
+      
+      // Require email verification ONLY if not OTP-verified
+      if(user && !user.emailVerified && !hasOtpVerification){
         alert('Please verify your email address before using the site. A verification link was sent to your email.');
         await signOut(auth);
         return;
@@ -2727,8 +2737,8 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
                   console.log('User created:', cred.user.uid);
                   await updateProfile(cred.user, { displayName: pending.name });
                   console.log('Profile updated');
-                  await setDoc(doc(db,'users', cred.user.uid), { name: pending.name, email: pending.email, createdAt: serverTimestamp() });
-                  console.log('Firestore user doc created');
+                  await setDoc(doc(db,'users', cred.user.uid), { name: pending.name, email: pending.email, otpVerified: true, createdAt: serverTimestamp() });
+                  console.log('Firestore user doc created with otpVerified flag');
                   closeAuth();
                   pending = null;
                   document.getElementById('otpInput').value = '';
