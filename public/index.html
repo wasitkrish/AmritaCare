@@ -2151,10 +2151,15 @@ function renderChatMessages(){
     const user = getEffectiveUser();
     const isOwn = user && msg.email === user.email;
     const reported = msg.reported || false;
+    const isPending = msg.pending === true;
+    const isFailed = msg.failed === true;
 
     // Create message container
     const container = document.createElement('div');
     container.className = isOwn ? 'chat-message-own' : 'chat-message-other';
+    // Add visual indicator for pending/failed
+    if(isPending) container.style.opacity = '0.7';
+    if(isFailed) container.style.opacity = '0.5'; container.style.borderLeft = '3px solid #ef4444';
 
     // Create avatar
     const avatar = document.createElement('div');
@@ -2166,10 +2171,11 @@ function renderChatMessages(){
     const content = document.createElement('div');
     content.className = 'chat-content';
 
-    // Create header (name + time)
+    // Create header (name + time + status)
     const header = document.createElement('div');
     header.className = 'chat-header';
-    header.innerHTML = `<strong>${escapeHtml(msg.from)}</strong> <span class="chat-time">${escapeHtml(msg.ts)}</span>`;
+    const statusLabel = isPending ? ' ⏳ sending...' : (isFailed ? ' ❌ failed' : '');
+    header.innerHTML = `<strong>${escapeHtml(msg.from)}</strong> <span class="chat-time">${escapeHtml(msg.ts)}${statusLabel}</span>`;
 
     // Create message bubble
     const bubble = document.createElement('div');
@@ -2800,7 +2806,7 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
   // helper to convert Firestore timestamp
   function formatTs(ts){ try{ if(!ts) return ''; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleTimeString(); }catch(e){ return ''; } }
 
-  // Override sendChatMessage to write to Firestore
+  // Override sendChatMessage to write to Firestore with instant local rendering
   window.sendChatMessage = async function(){
     const user = auth.currentUser;
     console.log('[DEBUG] window.sendChatMessage called, auth.currentUser:', user && user.email);
@@ -2814,19 +2820,60 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     }
     const txt = document.getElementById('messageInput').value.trim();
     if(!txt) return;
+    
+    const messageInput = document.getElementById('messageInput');
+    const chatWindow = document.getElementById('chatWindow');
+    
     try{
-      // Build payload explicitly so Firestore rules that require specific keys won't be missing them
+      // Create local message instantly (before Firestore commit)
+      const localMsg = {
+        id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+        from: user.displayName || user.email.split('@')[0],
+        email: user.email,
+        text: txt,
+        ts: new Date().toLocaleTimeString(),
+        timestamp: new Date(),
+        uid: user.uid,
+        pending: true,
+        reported: false
+      };
+      
+      // Render message locally immediately (no wait for Firestore)
+      window.chatMessages = window.chatMessages || [];
+      window.chatMessages.push(localMsg);
+      renderChatMessages();
+      messageInput.value = '';
+      
+      // Now send to Firestore (async, doesn't block UI)
       const payload = {
         uid: user.uid,
-        from: user.displayName || user.email.split('@')[0],
+        from: localMsg.from,
         email: user.email,
         text: txt,
         timestamp: serverTimestamp()
       };
       console.debug('[DEBUG] Firestore write payload (chats):', payload);
-      await addDoc(collection(db,'chats'), payload);
-      document.getElementById('messageInput').value='';
-    }catch(err){ console.error(err); alert('Failed to send message'); }
+      const docRef = await addDoc(collection(db,'chats'), payload);
+      
+      // Once Firestore confirms, update message ID and remove pending flag
+      const msgIdx = window.chatMessages.findIndex(m => m.id === localMsg.id);
+      if(msgIdx >= 0){
+        window.chatMessages[msgIdx].id = docRef.id;
+        window.chatMessages[msgIdx].pending = false;
+        renderChatMessages();
+      }
+      console.debug('[DEBUG] Message confirmed by Firestore with id:', docRef.id);
+    }catch(err){
+      console.error('[DEBUG] sendChatMessage failed:', err);
+      // Mark as failed in UI
+      const msgIdx = window.chatMessages.findIndex(m => m.pending && m.email === user.email && m.text === txt);
+      if(msgIdx >= 0){
+        window.chatMessages[msgIdx].pending = false;
+        window.chatMessages[msgIdx].failed = true;
+        renderChatMessages();
+      }
+      alert('Failed to send message: ' + (err.message || 'unknown error'));
+    }
   };
 
     // Wrap sendChatMessage with debug logging to capture errors and calls
@@ -2872,6 +2919,7 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
   function startChatListener(){
     if(unsubscribeChats) return;
     console.log('[DEBUG] startChatListener - setting up listener on chats collection with docChanges()');
+    // Allow null timestamps (pending messages) at start; Firestore auto-orders them there
     const q = query(collection(db,'chats'), orderBy('timestamp','asc'), limit(50));
     try{
       unsubscribeChats = onSnapshot(q, snap => {
@@ -2921,7 +2969,10 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
           const resp = await fetch('/api/messages');
           if(resp && resp.ok){ const j = await resp.json(); if(j && j.success && Array.isArray(j.messages)){ console.log('[DEBUG] /api/messages fallback returned', j.messages.length, 'messages'); window.chatMessages = j.messages; renderChatMessages(); return; } }
         }catch(e){ console.debug('Failed to fetch /api/messages fallback', e); }
-        window.chatMessages = window.chatMessages || JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
+        // Use cached local messages if available
+        if(!window.chatMessages || window.chatMessages.length === 0){
+          window.chatMessages = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
+        }
         renderChatMessages();
       })();
     });
