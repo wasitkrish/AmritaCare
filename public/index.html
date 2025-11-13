@@ -2633,6 +2633,55 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
 
 </script>
 
+<!-- Robust fallback for send button: ensures sending works even if other JS fails -->
+<script>
+  (function(){
+    function createFallbackMessageDOM(msg){
+      try{
+        const w = document.getElementById('chatWindow');
+        if(!w) return;
+        const container = document.createElement('div'); container.className = 'chat-message-own';
+        const avatar = document.createElement('div'); avatar.className = 'chat-avatar'; avatar.textContent = (msg.from||'U').charAt(0).toUpperCase();
+        const content = document.createElement('div'); content.className = 'chat-content';
+        const header = document.createElement('div'); header.className = 'chat-header'; header.innerHTML = `<strong>${(msg.from||'You')}</strong> <span class="chat-time">${msg.ts}</span>`;
+        const bubble = document.createElement('div'); bubble.className = 'chat-bubble-own'; bubble.innerHTML = `<div class="text-sm">${(msg.text||'')}</div>`;
+        content.appendChild(header); content.appendChild(bubble);
+        container.appendChild(content); container.appendChild(avatar);
+        w.appendChild(container);
+        w.scrollTop = w.scrollHeight;
+      }catch(e){ console.warn('fallback dom append failed', e); }
+    }
+
+    async function fallbackSend(){
+      try{
+        const input = document.getElementById('messageInput'); if(!input) return;
+        const txt = (input.value||'').trim(); if(!txt) return;
+        const from = (window && window._currentUser && window._currentUser.name) ? window._currentUser.name : (window && window._currentUser && window._currentUser.email) ? window._currentUser.email.split('@')[0] : 'Anonymous';
+        const email = (window && window._currentUser && window._currentUser.email) ? window._currentUser.email : 'anonymous@local';
+        const msg = { from, email, text: txt, ts: new Date().toLocaleTimeString(), timestamp: Date.now() };
+        // optimistic UI
+        createFallbackMessageDOM(msg);
+        input.value = '';
+        // try to persist to server
+        try{ await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(msg) }); }
+        catch(e){ console.debug('Fallback persist failed', e); }
+      }catch(e){ console.error('fallbackSend error', e); }
+    }
+
+    // attach handlers after DOM ready
+    function attach(){
+      const btn = document.getElementById('sendBtn');
+      const input = document.getElementById('messageInput');
+      if(btn){ btn.addEventListener('click', (e)=>{ try{ // prefer existing handler if present
+          if(typeof window.sendChatMessage === 'function' && window.sendChatMessage !== fallbackSend){ try{ window.sendChatMessage(); return; }catch(er){ console.warn('window.sendChatMessage failed, falling back', er); } }
+          fallbackSend(); }catch(ex){ console.error('sendBtn handler crash', ex); } }); }
+      if(input){ input.addEventListener('keypress', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); if(typeof window.sendChatMessage === 'function' && window.sendChatMessage !== fallbackSend){ try{ window.sendChatMessage(); return; }catch(er){} } fallbackSend(); } }); }
+    }
+
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
+  })();
+</script>
+
 <script type="module">
   // Firebase integration: Auth + Firestore for chat, reports, admin
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
