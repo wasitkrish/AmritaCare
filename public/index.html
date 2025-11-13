@@ -2708,10 +2708,12 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     function attach(){
       const btn = document.getElementById('sendBtn');
       const input = document.getElementById('messageInput');
-        if(btn){ btn.addEventListener('click', (e)=>{ try{ // prefer Firebase send only when signed-in
+        if(btn){ btn.addEventListener('click', (e)=>{ try{
+          console.debug('[DEBUG] sendBtn clicked', { hasFirebase: !!(window._firebase && window._firebase.auth && window._firebase.auth.currentUser), hasSendFn: typeof window.sendChatMessage === 'function' });
+          // prefer Firebase send only when signed-in
           if(typeof window.sendChatMessage === 'function' && window.sendChatMessage !== fallbackSend && window._firebase && window._firebase.auth && window._firebase.auth.currentUser){ try{ window.sendChatMessage(); return; }catch(er){ console.warn('window.sendChatMessage failed, falling back', er); } }
           fallbackSend(); }catch(ex){ console.error('sendBtn handler crash', ex); } }); }
-        if(input){ input.addEventListener('keypress', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); if(typeof window.sendChatMessage === 'function' && window.sendChatMessage !== fallbackSend && window._firebase && window._firebase.auth && window._firebase.auth.currentUser){ try{ window.sendChatMessage(); return; }catch(er){} } fallbackSend(); } }); }
+        if(input){ input.addEventListener('keypress', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); console.debug('[DEBUG] messageInput Enter pressed'); if(typeof window.sendChatMessage === 'function' && window.sendChatMessage !== fallbackSend && window._firebase && window._firebase.auth && window._firebase.auth.currentUser){ try{ window.sendChatMessage(); return; }catch(er){} } fallbackSend(); } }); }
     }
 
     if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attach); else attach();
@@ -2787,6 +2789,24 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       document.getElementById('messageInput').value='';
     }catch(err){ console.error(err); alert('Failed to send message'); }
   };
+
+    // Wrap sendChatMessage with debug logging to capture errors and calls
+    try{
+      if(window.sendChatMessage && typeof window.sendChatMessage === 'function'){
+        const __origSend = window.sendChatMessage;
+        window.sendChatMessage = async function(){
+          console.debug('[DEBUG] sendChatMessage invoked', { authUser: (auth && auth.currentUser) ? auth.currentUser.email : null });
+          try{
+            const res = await __origSend.apply(this, arguments);
+            console.debug('[DEBUG] sendChatMessage succeeded');
+            return res;
+          }catch(err){
+            console.error('[DEBUG] sendChatMessage failed', err);
+            throw err;
+          }
+        };
+      }
+    }catch(e){ console.warn('Could not wrap sendChatMessage for debug', e); }
 
   // start listening to latest 30 chats
   function startChatListener(){
