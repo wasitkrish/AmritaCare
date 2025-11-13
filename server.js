@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
@@ -120,10 +121,42 @@ app.post('/api/cloudinary-sign', (req, res) => {
   res.json({ signature, timestamp, api_key: apiKey, cloud_name: cloudName });
 });
 
-// --- OTP via Email (SendGrid) ---
+// --- OTP via Email (SendGrid with Gmail SMTP fallback) ---
 function base64url(str){ return Buffer.from(str).toString('base64').replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_'); }
 function base64urlDecode(b64){ return Buffer.from(b64.replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8'); }
 function signPayload(payload, secret){ return crypto.createHmac('sha256', secret).update(payload).digest('hex'); }
+
+// Gmail SMTP transporter for fallback (when SendGrid fails)
+async function sendViaGmail(toEmail, name, otp) {
+  const gmailUser = process.env.GMAIL_USER || process.env.GMAIL_EMAIL;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
+  if (!gmailUser || !gmailAppPassword) {
+    console.warn('Gmail credentials not configured for fallback');
+    return null;
+  }
+  
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: gmailUser, pass: gmailAppPassword }
+    });
+
+    const mailOptions = {
+      from: gmailUser,
+      to: toEmail,
+      subject: 'Your AmritaCare OTP',
+      text: `Hello ${name || 'User'},\n\nYour AmritaCare OTP is: ${otp}\nIt expires in 10 minutes.\n\nIf you didn't request this, please ignore this email.`
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email sent via Gmail:', info.messageId);
+    return true;
+  } catch (err) {
+    console.error('❌ Gmail send failed:', err.message);
+    return false;
+  }
+}
+
 
 app.post('/api/send-otp', async (req, res) => {
   try{
@@ -139,42 +172,46 @@ app.post('/api/send-otp', async (req, res) => {
     const signature = signPayload(payload, secret);
     const token = `${base64url(payload)}.${signature}`;
 
-    // Send via SendGrid
-    // Trim env values to avoid accidental trailing newlines/spaces (common when copying values)
+    // Try SendGrid first
     const sendgridKey = (process.env.SENDGRID_API_KEY || '').trim();
     const fromEmail = (process.env.SENDGRID_FROM || process.env.VITE_FORMSUBMIT_EMAIL || '').trim();
-    if(!sendgridKey || !fromEmail) return res.status(500).json({ error: 'email_not_configured' });
+    
+    if(sendgridKey && fromEmail) {
+      const msg = {
+        personalizations: [{ to: [{ email }] }],
+        from: { email: fromEmail },
+        subject: 'Your AmritaCare OTP',
+        content: [{ type: 'text/plain', value: `Hello ${name || ''},\n\nYour AmritaCare OTP is: ${otp}\nIt expires in 10 minutes.` }]
+      };
 
-    const msg = {
-      personalizations: [{ to: [{ email }] }],
-      from: { email: fromEmail },
-      subject: 'Your AmritaCare OTP',
-      content: [{ type: 'text/plain', value: `Hello ${name || ''},\n\nYour AmritaCare OTP is: ${otp}\nIt expires in 10 minutes.` }]
-    };
+      const sgRes = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: { 'authorization': `Bearer ${sendgridKey}`, 'content-type':'application/json' },
+        body: JSON.stringify(msg)
+      });
 
-    const sgRes = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: { 'authorization': `Bearer ${sendgridKey}`, 'content-type':'application/json' },
-      body: JSON.stringify(msg)
-    });
-
-    if(!sgRes.ok){
-      const text = await sgRes.text();
-      console.error('SendGrid error', text);
-      // If SendGrid rejects because of invalid from, surface that clearly for debugging
-      try{
-        const parsed = JSON.parse(text);
-        return res.status(500).json({ error: 'email_send_failed', detail: parsed });
-      }catch(e){
-        return res.status(500).json({ error: 'email_send_failed', detail: text });
+      if(sgRes.ok) {
+        console.log('✅ OTP sent via SendGrid');
+        return res.json({ success: true, token, via: 'sendgrid' });
+      } else {
+        const text = await sgRes.text();
+        console.warn('SendGrid failed, attempting Gmail fallback:', text);
+        // Fall through to Gmail attempt
       }
     }
 
-    return res.json({ success: true, token });
-  }catch(err){ console.error('send-otp', err);
-    // Return error details temporarily to help debugging (will revert after fix)
-    const message = err && err.message ? err.message : String(err);
-    return res.status(500).json({ error: 'server_error', detail: message, stack: err.stack ? err.stack.split('\n').slice(0,5) : undefined }); }
+    // Fallback: Try Gmail
+    const gmailSuccess = await sendViaGmail(email, name, otp);
+    if(gmailSuccess) {
+      return res.json({ success: true, token, via: 'gmail' });
+    }
+
+    // Both failed
+    return res.status(500).json({ error: 'email_send_failed', detail: 'Both SendGrid and Gmail failed. Check server configuration.' });
+  }catch(err){ 
+    console.error('send-otp', err);
+    return res.status(500).json({ error: 'server_error', detail: err.message });
+  }
 });
 
 app.post('/api/verify-otp', (req, res) => {
