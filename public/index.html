@@ -2074,8 +2074,52 @@ function clearAllChats(){
   }
 }
 
-// Chat button listeners will be attached INSIDE the Firebase module (after the override is defined)
-// to ensure they use the Firestore-backed sendChatMessage functionmessageInput.addEventListener('keypress', (e)=>{
+const sendBtn = document.getElementById('sendBtn');
+const messageInput = document.getElementById('messageInput');
+const clearChatBtn = document.getElementById('clearChatBtn');
+
+sendBtn.addEventListener('click', ()=>{
+  sendChatMessage();
+});
+
+clearChatBtn.addEventListener('click', async ()=>{
+  if(!window._firebase || !window._firebase.auth) { clearAllChats(); return; }
+  const user = window._firebase.auth.currentUser;
+  const isAdmin = user ? await checkIsAdmin(user.uid) : false;
+  if(!isAdmin){ alert('Only admins can clear chat.'); return; }
+  if(!confirm('Clear all chats? This cannot be undone.')) return;
+  // delete all chats from Firestore using v12 modular API
+  try{
+    const { writeBatch, getDocs, collection, deleteDoc, doc } = window._firebase.db.__firestore || {};
+    const db = window._firebase.db;
+    // Import writeBatch from module scope (need to use imported function)
+    // For now, use the alternative: delete each doc individually or use REST API
+    // Since we can't access writeBatch directly, let's iterate and delete
+    const chatsRef = collection(db, 'chats');
+    const snapshot = await getDocs(chatsRef);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+    alert('Chats cleared');
+  }catch(e){ 
+    console.error('Clear error:', e); 
+    // Fallback: try individual deletes
+    try{
+      const { getDocs, collection, deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js");
+      const db = window._firebase.db;
+      const chatsRef = collection(db, 'chats');
+      const snapshot = await getDocs(chatsRef);
+      for(const d of snapshot.docs){
+        await deleteDoc(d.ref);
+      }
+      alert('Chats cleared');
+    }catch(e2){ console.error(e2); alert('Failed to clear. Check Firestore setup.'); }
+  }
+});
+
+messageInput.addEventListener('keypress', (e)=>{
   if(e.key === 'Enter' && !e.shiftKey){
     e.preventDefault();
     sendChatMessage();
@@ -2518,37 +2562,6 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
 
   function stopChatListener(){ if(unsubscribeChats){ unsubscribeChats(); unsubscribeChats = null; } }
 
-  // Bind chat button listeners NOW (inside Firebase module) so they use the Firestore-backed sendChatMessage
-  const sendBtn = document.getElementById('sendBtn');
-  const clearChatBtn = document.getElementById('clearChatBtn');
-  if(sendBtn){
-    sendBtn.addEventListener('click', ()=>{
-      window.sendChatMessage();
-    });
-  }
-  if(clearChatBtn){
-    clearChatBtn.addEventListener('click', async ()=>{
-      const user = auth.currentUser;
-      const isAdmin = user ? await checkIsAdmin(user.uid) : false;
-      if(!isAdmin){ alert('Only admins can clear chat.'); return; }
-      if(!confirm('Clear all chats? This cannot be undone.')) return;
-      try{
-        const { writeBatch, getDocs, collection: col, deleteDoc } = window._firebase.db.__firestore || {};
-        const chatsRef = col(db, 'chats');
-        const snapshot = await getDocs(chatsRef);
-        const batch = writeBatch(db);
-        snapshot.docs.forEach(d => {
-          batch.delete(d.ref);
-        });
-        await batch.commit();
-        alert('Chats cleared');
-      }catch(e){
-        console.error('Clear error:', e);
-        alert('Failed to clear chats. Check Firestore setup.');
-      }
-    });
-  }
-
   // report chat -> add to reports collection and mark chat
   window.reportChat = async function(msgId){
     const user = auth.currentUser; if(!user){ openAuth('login'); return; }
@@ -2626,18 +2639,8 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       const bannedSnap = await getDoc(doc(db,'banned', user.uid));
       if(bannedSnap.exists()){
         alert('Your account is banned.'); await signOut(auth); return; }
-      
-      // Check if user has been OTP-verified (flag stored during signup)
-      let hasOtpVerification = false;
-      try{ 
-        const ud = await getDoc(doc(db,'users', user.uid)); 
-        if(ud.exists()) {
-          hasOtpVerification = ud.data().otpVerified || false;
-        }
-      }catch(e){ console.warn('Could not check OTP verification status'); }
-      
-      // Require email verification ONLY if not OTP-verified
-      if(user && !user.emailVerified && !hasOtpVerification){
+      // require email verification
+      if(user && !user.emailVerified){
         alert('Please verify your email address before using the site. A verification link was sent to your email.');
         await signOut(auth);
         return;
@@ -2724,8 +2727,8 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
                   console.log('User created:', cred.user.uid);
                   await updateProfile(cred.user, { displayName: pending.name });
                   console.log('Profile updated');
-                  await setDoc(doc(db,'users', cred.user.uid), { name: pending.name, email: pending.email, otpVerified: true, createdAt: serverTimestamp() });
-                  console.log('Firestore user doc created with otpVerified flag');
+                  await setDoc(doc(db,'users', cred.user.uid), { name: pending.name, email: pending.email, createdAt: serverTimestamp() });
+                  console.log('Firestore user doc created');
                   closeAuth();
                   pending = null;
                   document.getElementById('otpInput').value = '';
