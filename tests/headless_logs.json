@@ -1,0 +1,90 @@
+{
+  "logs": [
+    {
+      "type": "console",
+      "text": "cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation"
+    },
+    {
+      "type": "requestfailed",
+      "url": "http://localhost:3000/videos/Muks.mp4",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    },
+    {
+      "type": "requestfailed",
+      "url": "http://localhost:3000/videos/Teacher.mp4",
+      "failure": {
+        "errorText": "net::ERR_ABORTED"
+      }
+    },
+    {
+      "type": "console",
+      "text": "[DOM] Input elements should have autocomplete attributes (suggested: \"current-password\"): (More info: https://goo.gl/9p2vKq) %o"
+    },
+    {
+      "type": "console",
+      "text": "[DOM] Input elements should have autocomplete attributes (suggested: \"current-password\"): (More info: https://goo.gl/9p2vKq) %o"
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] /api/firebase-config response: JSHandle@object"
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] Initializing Firebase with config (masked): JSHandle@object"
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] window._firebase set true"
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] startChatListener - setting up listener on chats collection"
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] onAuthStateChanged - user: "
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] updateAuthGates - session user:  firebaseUser: "
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] updateAuthGates - session user:  firebaseUser: "
+    },
+    {
+      "type": "console",
+      "text": "Video playing successfully"
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] updateAuthGates - session user: JSHandle@object firebaseUser: "
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] sendChatMessage invoked JSHandle@object"
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] window.sendChatMessage called, auth.currentUser: "
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] sendChatMessage succeeded"
+    },
+    {
+      "type": "console",
+      "text": "[DEBUG] sendBtn clicked JSHandle@object"
+    }
+  ],
+  "requests": [
+    {
+      "url": "http://localhost:3000/api/messages",
+      "method": "POST",
+      "postData": "{\"from\":\"Headless Bot\",\"email\":\"headless@bl.students.amrita.edu\",\"text\":\"Headless test message\",\"ts\":\"8:38:57 PM\",\"timestamp\":1763046537943}"
+    }
+  ],
+  "chatHtml": "<div class=\"chat-message-own\"><div class=\"chat-content\"><div class=\"chat-header\"><strong>Headless Bot</strong> <span class=\"chat-time\">8:38:57 PM</span></div><div class=\"chat-bubble-own\"><div class=\"text-sm\">Headless test message</div></div><div class=\"chat-actions\"><button type=\"button\" class=\"report-btn\" data-id=\"local_1763046537943\">Report</button></div></div><div class=\"chat-avatar\">HB</div></div>"
+}

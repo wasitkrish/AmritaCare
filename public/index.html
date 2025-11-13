@@ -593,6 +593,8 @@ input.form-input {
   transition: all 0.25s ease;
   font-size: 0.95rem;
 }
+/* Prevent manual resizing of textareas to keep layout consistent */
+textarea.form-input { resize: none; }
 
 /* Placeholder color */
 .form-input::placeholder {
@@ -1090,27 +1092,26 @@ function updateAuthGates(){
   const sendBtn = document.getElementById('sendBtn');
   const clearChatBtn = document.getElementById('clearChatBtn');
       if(messageInput){
-    messageInput.placeholder = logged ? 'Type a message...' : 'Login to send messages';
-    // focus/click should prompt login when not logged
-    if(!messageInput._authInterceptor){
-      messageInput.addEventListener('focus', ()=>{ if(!getEffectiveUser()) openAuth('login'); });
-      messageInput._authInterceptor = true;
-    }
+        messageInput.placeholder = logged ? 'Type a message...' : 'Sign in to participate in chat';
+        // allow users to read the chat even when not signed in, but prevent typing
+        messageInput.disabled = !logged;
   }
   // helper to add a click interceptor that opens auth when not logged
-  function addClickInterceptor(el){
-    if(!el || el._authClickInterceptor) return;
-    el.addEventListener('click', (e)=>{
-      if(!getEffectiveUser()){
-        e.preventDefault();
-        openAuth('login');
+      function addClickInterceptor(el){
+        if(!el || el._authClickInterceptor) return;
+        el.addEventListener('click', (e)=>{
+          // Instead of force-opening the auth modal, show a non-blocking toast prompting login
+          if(!getEffectiveUser()){
+            e.preventDefault();
+            showToast('Please sign in to send messages', 'Login', ()=> openAuth('login'));
+          }
+        });
+        el._authClickInterceptor = true;
       }
-    });
-    el._authClickInterceptor = true;
-  }
   if(sendBtn){
-    sendBtn.title = logged ? '' : 'Login to send messages';
-    addClickInterceptor(sendBtn);
+        sendBtn.title = logged ? '' : 'Login to send messages';
+        // keep the button clickable so users can see the toast prompting them to sign in
+        addClickInterceptor(sendBtn);
   }
   if(clearChatBtn){
     clearChatBtn.title = logged ? '' : 'Login to clear messages';
@@ -1130,14 +1131,14 @@ function updateAuthGates(){
   if(shareMessage) {
     // focusing while logged out prompts login
     if(!shareMessage._authInterceptor){
-      shareMessage.addEventListener('focus', ()=>{ if(!getEffectiveUser()) openAuth('login'); });
+      shareMessage.addEventListener('focus', ()=>{ if(!getEffectiveUser()) showToast('Please sign in to share your experience', 'Login', ()=> openAuth('login')); });
       shareMessage._authInterceptor = true;
     }
   }
   if(shareFile){
     // clicking file chooser should prompt login when not logged
     if(!uploadLabel._authInterceptor){
-      uploadLabel.addEventListener('click', (e)=>{ if(!getEffectiveUser()){ e.preventDefault(); openAuth('login'); } });
+      uploadLabel.addEventListener('click', (e)=>{ if(!getEffectiveUser()){ e.preventDefault(); showToast('Please sign in to upload files', 'Login', ()=> openAuth('login')); } });
       uploadLabel._authInterceptor = true;
     }
   }
@@ -1188,7 +1189,7 @@ function updateAuthGates(){
           el.addEventListener('click', (e)=>{ 
             if(!getEffectiveUser()){ 
               e.preventDefault(); 
-              openAuth('login'); 
+              showToast('Please sign in to submit the contact form', 'Login', ()=> openAuth('login'));
             } 
           });
           el._authSubmitInterceptor = true;
@@ -1196,6 +1197,24 @@ function updateAuthGates(){
       }
     });
   }
+}
+
+// Simple toast helper for non-blocking popups
+function showToast(text, actionLabel, actionFn){
+  try{
+    let container = document.getElementById('mh_toast_container');
+    if(!container){ container = document.createElement('div'); container.id = 'mh_toast_container'; container.style.position = 'fixed'; container.style.right = '16px'; container.style.bottom = '24px'; container.style.zIndex = 10002; container.style.display = 'flex'; container.style.flexDirection = 'column'; container.style.gap = '8px'; document.body.appendChild(container); }
+    const t = document.createElement('div');
+    t.className = 'mh_toast';
+    t.style.background = '#111827'; t.style.color = '#fff'; t.style.padding = '10px 12px'; t.style.borderRadius = '10px'; t.style.boxShadow = '0 6px 24px rgba(2,6,23,0.3)'; t.style.display = 'flex'; t.style.alignItems = 'center'; t.style.gap = '8px'; t.style.minWidth = '220px';
+    const span = document.createElement('div'); span.textContent = text; span.style.flex = '1'; span.style.fontSize = '13px';
+    t.appendChild(span);
+    if(actionLabel && typeof actionFn === 'function'){
+      const btn = document.createElement('button'); btn.textContent = actionLabel; btn.style.background = '#4f46e5'; btn.style.color = '#fff'; btn.style.border = 'none'; btn.style.padding = '6px 8px'; btn.style.borderRadius = '6px'; btn.style.cursor = 'pointer'; btn.addEventListener('click', ()=>{ try{ actionFn(); }catch(e){} try{ t.remove(); }catch(e){} }); t.appendChild(btn);
+    }
+    container.appendChild(t);
+    setTimeout(()=>{ try{ t.remove(); }catch(e){} }, 6000);
+  }catch(e){ console.warn('showToast failed', e); }
 }
 
 /* Email validation for institutional email */
@@ -2019,8 +2038,8 @@ document.getElementById('contactForm').addEventListener('submit', e=> {
   // Require user to be logged in before allowing contact submission
   const user = getEffectiveUser();
   if(!user){
-    // open auth modal to prompt login/signup
-    openAuth('login');
+    // Show non-blocking toast prompting login
+    showToast('Please sign in to submit the contact form', 'Login', ()=> openAuth('login'));
     return;
   }
 
@@ -2060,15 +2079,19 @@ document.getElementById('contactForm').addEventListener('submit', e=> {
     .then(j=>{
       if(j.success){
         statusEl.textContent = '✅ Message sent — we will get back to you soon.';
+        // show popup toast for success
+        showToast('Message sent — we will get back to you soon.');
         formEl.reset();
         // Refresh contact form prefill after reset
         setTimeout(()=> window.dispatchEvent(new Event('loginSuccess')), 200);
       } else {
         statusEl.textContent = '⚠️ Failed to send email; saved locally.';
+        showToast('Failed to send message; saved locally.');
       }
     }).catch(err=>{
       console.error('FormSubmit error', err);
       statusEl.textContent = '⚠️ Network error — message saved locally.';
+      showToast('Network error — message saved locally.');
     });
 });
 
@@ -2819,12 +2842,40 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       snap.forEach(d => { const data = d.data(); msgs.push({ id: d.id, from: data.from, email: data.email, text: data.text, ts: formatTs(data.timestamp), timestamp: data.timestamp, uid: data.uid, reported: data.reported||false }); });
       // reverse to show oldest first
       msgs.reverse();
-      // If snapshot returned empty but we already have local messages, don't overwrite with empty (prevents UI flash)
-      if(Array.isArray(msgs) && msgs.length === 0 && Array.isArray(window.chatMessages) && window.chatMessages.length > 0){
-        console.log('[DEBUG] Firestore snapshot empty — preserving existing chatMessages from local state');
-        try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
+      // If snapshot returned empty, try server fallback before rendering an empty UI
+      if(Array.isArray(msgs) && msgs.length === 0){
+        // If we already have local messages, preserve them (avoid UI flash)
+        if(Array.isArray(window.chatMessages) && window.chatMessages.length > 0){
+          console.log('[DEBUG] Firestore snapshot empty — preserving existing chatMessages from local state');
+          try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
+          return;
+        }
+
+        // No local messages — attempt server fallback to populate chats
+        (async ()=>{
+          try{
+            console.log('[DEBUG] Firestore snapshot empty — attempting /api/messages fallback');
+            const resp = await fetch('/api/messages');
+            if(resp && resp.ok){
+              const j = await resp.json();
+              if(j && j.success && Array.isArray(j.messages) && j.messages.length > 0){
+                window.chatMessages = j.messages;
+                try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
+                renderChatMessages();
+                return;
+              }
+            }
+          }catch(e){ console.debug('Failed to fetch /api/messages fallback after empty snapshot', e); }
+
+          // If fallback didn't produce messages, use empty snapshot (show no messages)
+          window.chatMessages = msgs;
+          try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
+          renderChatMessages();
+        })();
+
         return;
       }
+
       window.chatMessages = msgs;
       // clear any status message
       try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
