@@ -2485,9 +2485,14 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     firebaseConfig = null;
   }
 
-  // Only use Firebase auth when a real apiKey is present in the config.
-  if (!firebaseConfig || !firebaseConfig.apiKey || (typeof firebaseConfig.apiKey === 'string' && firebaseConfig.apiKey.trim() === '')) {
-    console.warn('Firebase not configured or missing apiKey. Local auth will be used.');
+  // Only use Firebase auth when a complete config is present (prevents partial/misconfigured envs from disabling local OTP)
+  const hasApiKey = firebaseConfig && firebaseConfig.apiKey && String(firebaseConfig.apiKey).trim() !== '';
+  const hasAuthDomain = firebaseConfig && firebaseConfig.authDomain && String(firebaseConfig.authDomain).trim() !== '';
+  const hasProjectId = firebaseConfig && firebaseConfig.projectId && String(firebaseConfig.projectId).trim() !== '';
+  const hasAppId = firebaseConfig && firebaseConfig.appId && String(firebaseConfig.appId).trim() !== '';
+
+  if (!(hasApiKey && hasAuthDomain && hasProjectId && hasAppId)) {
+    console.warn('Firebase config incomplete or missing required fields. Falling back to local OTP flow.');
     window._useFirebaseAuth = false;
   } else {
     const app = initializeApp(firebaseConfig);
