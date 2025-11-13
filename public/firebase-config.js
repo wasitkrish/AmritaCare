@@ -1,82 +1,87 @@
 /**
- * Firebase & Services Configuration
- * This file initializes Firebase, Cloudinary, and other services
+ * Runtime Firebase & Cloudinary config loader
+ * Fetches secrets from server endpoints so env vars stay on server (Vercel-safe)
  */
 
-// Initialize Firebase
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'YOUR_API_KEY',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'your-project.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'your-project-id',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'your-project.appspot.com',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '123456789',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:123456789:web:abc123def456'
-};
-
-// Initialize Firebase (if SDK is loaded)
-let firebaseApp = null;
-let firebaseAuth = null;
-let firebaseDb = null;
-let firebaseStorage = null;
-
-try {
-  if (typeof firebase !== 'undefined') {
-    firebaseApp = firebase.initializeApp(firebaseConfig);
-    firebaseAuth = firebase.auth();
-    firebaseDb = firebase.firestore();
-    firebaseStorage = firebase.storage();
-    console.log('✅ Firebase initialized successfully');
-  }
-} catch (error) {
-  console.warn('⚠️ Firebase initialization skipped:', error.message);
-}
-
-// Cloudinary Configuration
-const cloudinaryConfig = {
-  cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'your_cloud_name',
-  uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'mental-health-upload',
-  apiEndpoint: 'https://api.cloudinary.com/v1_1'
-};
-
-// Cloudinary Upload Function (Client-side)
-async function uploadToCloudinary(file) {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', cloudinaryConfig.uploadPreset);
-    
-    const response = await fetch(
-      `${cloudinaryConfig.apiEndpoint}/${cloudinaryConfig.cloudName}/auto/upload`,
-      {
-        method: 'POST',
-        body: formData
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
+(async function(){
+  const defaults = {
+    firebase: {
+      apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: ''
+    },
+    cloudinary: {
+      cloud_name: '', upload_preset: 'mental-health-upload', apiEndpoint: 'https://api.cloudinary.com/v1_1'
     }
-    
-    const data = await response.json();
-    return {
-      success: true,
-      url: data.secure_url,
-      public_id: data.public_id,
-      type: data.resource_type
-    };
-  } catch (error) {
-    console.error('❌ Cloudinary upload error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
+  };
 
-// Export for use in main.js or inline scripts
-window.firebaseConfig = firebaseConfig;
-window.cloudinaryConfig = cloudinaryConfig;
-window.uploadToCloudinary = uploadToCloudinary;
-window.firebaseAuth = firebaseAuth;
-window.firebaseDb = firebaseDb;
-window.firebaseStorage = firebaseStorage;
+  // Fetch firebase config from server
+  try{
+    const r = await fetch('/api/firebase-config');
+    if(r.ok){
+      const cfg = await r.json();
+      window.firebaseConfig = Object.assign({}, defaults.firebase, cfg);
+    } else {
+      window.firebaseConfig = defaults.firebase;
+    }
+  }catch(e){ console.warn('Could not fetch /api/firebase-config', e); window.firebaseConfig = defaults.firebase; }
+
+  // Fetch cloudinary config (cloud name + upload preset) if available
+  try{
+    const r2 = await fetch('/api/cloudinary-config');
+    if(r2.ok){
+      const c = await r2.json();
+      window.cloudinaryConfig = {
+        cloud_name: c.cloud_name || defaults.cloudinary.cloud_name,
+        upload_preset: c.upload_preset || defaults.cloudinary.upload_preset,
+        apiEndpoint: defaults.cloudinary.apiEndpoint
+      };
+    } else {
+      window.cloudinaryConfig = defaults.cloudinary;
+    }
+  }catch(e){ console.warn('Could not fetch /api/cloudinary-config', e); window.cloudinaryConfig = defaults.cloudinary; }
+
+  // Initialize Firebase if SDK loaded and config present
+  try{
+    if(window.firebase && window.firebaseConfig && window.firebaseConfig.apiKey){
+      try{ window._firebaseApp = window.firebase.initializeApp(window.firebaseConfig); window._firebaseAuth = window.firebase.auth(); window._firebaseDb = window.firebase.firestore(); window._firebaseStorage = window.firebase.storage(); console.log('Firebase initialized'); }catch(e){ console.warn('Firebase init failed', e); }
+    }
+  }catch(e){ console.warn('Firebase init error', e); }
+
+  // upload helper: try signed upload first, fallback to unsigned preset
+  async function uploadToCloudinary(file){
+    // try getting a signature from server
+    try{
+      const sigResp = await fetch('/api/cloudinary-sign', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ filename: file.name }) });
+      if(sigResp.ok){
+        const sig = await sigResp.json();
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('api_key', sig.api_key);
+        fd.append('timestamp', sig.timestamp);
+        fd.append('signature', sig.signature);
+        const url = `${sig.cloud_name ? 'https://api.cloudinary.com/v1_1/'+sig.cloud_name : window.cloudinaryConfig.apiEndpoint+'/'+window.cloudinaryConfig.cloud_name}/auto/upload`;
+        const up = await fetch(url, { method: 'POST', body: fd });
+        if(!up.ok) throw new Error('Signed upload failed');
+        const j = await up.json(); return { success:true, url: j.secure_url, public_id: j.public_id };
+      }
+    }catch(e){
+      console.warn('Signed upload not available, falling back to unsigned preset', e);
+    }
+
+    // fallback unsigned using upload_preset
+    try{
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', window.cloudinaryConfig.upload_preset || 'mental-health-upload');
+      const url = `${window.cloudinaryConfig.apiEndpoint}/${window.cloudinaryConfig.cloud_name}/auto/upload`;
+      const up = await fetch(url, { method: 'POST', body: fd });
+      if(!up.ok) throw new Error('Unsigned upload failed');
+      const j = await up.json(); return { success:true, url: j.secure_url, public_id: j.public_id };
+    }catch(err){
+      console.error('Cloudinary upload failed', err);
+      return { success:false, error: err.message };
+    }
+  }
+
+  window.uploadToCloudinary = uploadToCloudinary;
+})();
+

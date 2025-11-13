@@ -8,6 +8,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -82,10 +83,47 @@ app.get("/api/messages", (req, res) => {
 /**
  * Fallback - Serve index.html for all other routes (SPA)
  */
+
+// Provide Firebase config to client (read from environment)
+app.get('/api/firebase-config', (req, res) => {
+  const cfg = {
+    apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || '',
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || '',
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || '',
+    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || ''
+  };
+  res.json(cfg);
+});
+
+// Cloudinary config endpoint (client can GET to read cloud name / preset)
+app.get('/api/cloudinary-config', (req, res) => {
+  const cloudName = process.env.VITE_CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME || '';
+  const uploadPreset = process.env.VITE_CLOUDINARY_UPLOAD_PRESET || process.env.CLOUDINARY_UPLOAD_PRESET || '';
+  if(!cloudName) return res.status(404).json({ error: 'not-configured' });
+  res.json({ cloud_name: cloudName, upload_preset: uploadPreset });
+});
+
+// Cloudinary sign endpoint for signed uploads (client can POST and receive signature)
+app.post('/api/cloudinary-sign', (req, res) => {
+  // Prefer non-VITE env vars for secrets so they are not accidentally embedded in client builds.
+  const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET;
+  const apiKey = process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY;
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME;
+  if (!apiSecret || !apiKey || !cloudName) {
+    return res.status(500).json({ error: 'Cloudinary not configured on server' });
+  }
+  const timestamp = Math.floor(Date.now() / 1000);
+  const toSign = `timestamp=${timestamp}`;
+  const signature = crypto.createHash('sha1').update(toSign + apiSecret).digest('hex');
+  res.json({ signature, timestamp, api_key: apiKey, cloud_name: cloudName });
+});
+
+// Serve SPA fallback
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
-
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("❌ Server error:", err);

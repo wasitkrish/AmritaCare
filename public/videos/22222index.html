@@ -95,11 +95,166 @@
   .video-slide video{ 
     width:100%; 
     height:100%; 
-    object-fit:contain; 
+    object-fit:cover; 
     border-radius:12px; 
     display:block; 
-    background:#000;
+    background:transparent;
   }
+
+  /* small utilities */
+  .controls{ display:flex; gap:10px; align-items:center; }
+  .dot{ width:8px; height:8px; border-radius:9999px; background:var(--dot-inactive); }
+  .dot.active{ background:var(--dot-active); }
+</style>
+</head>
+<body>
+
+<div class="max-w-5xl mx-auto p-6">
+  <header class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-semibold">AmritaCare — Student Videos</h1>
+    <div class="controls">
+      <button id="themeBtn" class="toggle-switch"><span class="toggle-ball"></span></button>
+    </div>
+  </header>
+
+  <main>
+    <section class="mb-6">
+      <div class="card p-4">
+        <div id="gallery" class="gallery-viewport" style="height:420px">
+          <div class="gallery-track" id="galleryTrack">
+            <!-- slides injected by JS -->
+          </div>
+        </div>
+        <div class="flex items-center justify-between mt-3">
+          <div class="flex items-center gap-2" id="dots"></div>
+          <div>
+            <button id="prevBtn" class="px-3 py-1 bg-gray-200 rounded">Prev</button>
+            <button id="nextBtn" class="px-3 py-1 bg-gray-200 rounded">Next</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-6">
+      <div class="card p-4">
+        <h2 class="font-semibold mb-2">Upload a video</h2>
+        <p class="muted text-sm mb-3">Files are uploaded to Cloudinary via a signed request from the server.</p>
+        <input id="fileInput" type="file" accept="video/*" class="form-input mb-2" />
+        <div class="flex items-center gap-2">
+          <button id="uploadBtn" class="px-4 py-2 bg-indigo-600 text-white rounded">Upload</button>
+          <span id="uploadStatus" class="muted text-sm">No upload yet</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-6">
+      <div class="card p-4">
+        <h2 class="font-semibold mb-2">Contact</h2>
+        <form action="https://formsubmit.co/singhkrish.np@gmail.com" method="POST" id="contactForm">
+          <input type="hidden" name="_subject" value="Contact from AmritaCare" />
+          <div class="mb-2"><input name="name" placeholder="Your name" class="form-input" required /></div>
+          <div class="mb-2"><input name="email" placeholder="Your email" class="form-input" required /></div>
+          <div class="mb-2"><textarea name="message" rows="4" placeholder="Message" class="form-input" required></textarea></div>
+          <button class="px-4 py-2 bg-green-600 text-white rounded">Send</button>
+        </form>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script type="module">
+// minimal client logic: load initial videos, wire upload signing and firebase config fetch
+const videos = [
+  '/videos/sample1.mp4',
+  '/videos/sample2.mp4'
+];
+
+const track = document.getElementById('galleryTrack');
+const dotsWrap = document.getElementById('dots');
+let pos = 0;
+
+function createSlide(src){
+  const slide = document.createElement('div');
+  slide.className = 'video-slide';
+  const v = document.createElement('video');
+  v.src = src; v.controls = true; v.playsInline = true; v.preload = 'metadata';
+  slide.appendChild(v);
+  return slide;
+}
+
+function renderGallery(){
+  track.innerHTML = '';
+  dotsWrap.innerHTML = '';
+  videos.forEach((s,i)=>{
+    track.appendChild(createSlide(s));
+    const d = document.createElement('div'); d.className='dot'+(i===0? ' active':''); dotsWrap.appendChild(d);
+  });
+}
+
+function goTo(i){
+  pos = (i+videos.length)%videos.length;
+  track.style.transform = `translateX(${-pos*100}%)`;
+  Array.from(dotsWrap.children).forEach((d,idx)=> d.classList.toggle('active', idx===pos));
+}
+
+document.getElementById('prevBtn').addEventListener('click', ()=> goTo(pos-1));
+document.getElementById('nextBtn').addEventListener('click', ()=> goTo(pos+1));
+
+renderGallery();
+
+// upload flow: request signature from server then upload to Cloudinary
+document.getElementById('uploadBtn').addEventListener('click', async ()=>{
+  const fileEl = document.getElementById('fileInput');
+  const status = document.getElementById('uploadStatus');
+  if(!fileEl.files.length) return alert('pick a file');
+  const file = fileEl.files[0];
+  status.textContent = 'Requesting signature...';
+  try{
+    const sigRes = await fetch('/api/cloudinary-sign', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ filename: file.name }) });
+    if(!sigRes.ok) throw new Error('sign failed');
+    const sig = await sigRes.json();
+    const form = new FormData();
+    form.append('file', file);
+    form.append('api_key', sig.api_key);
+    form.append('timestamp', sig.timestamp);
+    form.append('signature', sig.signature);
+    const up = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloud_name}/auto/upload`, { method:'POST', body: form });
+    const data = await up.json();
+    if(data && data.secure_url){
+      status.textContent = 'Uploaded ✓';
+      // add to gallery
+      videos.push(data.secure_url);
+      renderGallery();
+      goTo(videos.length-1);
+    } else {
+      status.textContent = 'Upload failed';
+    }
+  }catch(err){ console.error(err); status.textContent = 'Upload error'; }
+});
+
+// firebase config helper (optional) — client fetches server-provided config
+async function loadFirebaseConfig(){
+  try{
+    const res = await fetch('/api/firebase-config');
+    if(!res.ok) return;
+    const cfg = await res.json();
+    if(cfg && Object.keys(cfg).length){
+      // load firebase dynamically if desired, but leave it optional
+      console.log('firebase config loaded');
+    }
+  }catch(e){ console.warn('no firebase config'); }
+}
+
+loadFirebaseConfig();
+
+// theme toggle
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.addEventListener('click', ()=> document.documentElement.classList.toggle('dark'));
+</script>
+
+</body>
+</html>
 
   /* Centered overlay controls (only visible on hover / touch-active) */
   .video-overlay{
@@ -425,16 +580,20 @@
   }
   
   #chatWindow::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.3);
+    background: rgba(99,102,241,0.3);
     border-radius: 3px;
   }
   
   #chatWindow::-webkit-scrollbar-thumb:hover {
-    background: rgba(99, 102, 241, 0.5);
+    background: rgba(99,102,241,0.5);
   }
   
   .dark #chatWindow::-webkit-scrollbar-thumb {
     background: rgba(139, 92, 246, 0.4);
+  }
+  
+  .dark #chatWindow::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.6);
   }
   
   .dark #chatWindow::-webkit-scrollbar-thumb:hover {
@@ -636,15 +795,25 @@ input.form-input {
 }
 
 </style>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"></script>
+
 </head>
 <body>
+
+<!-- Firebase & Services Configuration -->
+<script src="/firebase-config.js"></script>
 
 <!-- Header -->
 <header class="sticky top-0 z-50">
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
       <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold">MH</div>
-  <h1 class="text-lg font-bold text-indigo-700 dark:text-indigo-300">AmritaCare Demo</h1>
+      <h1 class="text-lg font-bold text-indigo-700 dark:text-indigo-300">Mental Health Demo</h1>
     </div>
 
     <div class="flex items-center gap-3">
@@ -662,14 +831,14 @@ input.form-input {
       <h2 class="text-2xl sm:text-3xl font-semibold text-indigo-700 dark:text-indigo-300">Featured Experiences</h2>
     </div>
 
-    <div class="relative gallery-viewport card" id="galleryViewport">
+    <div class="relative gallery-viewport card h-64 sm:h-80 lg:h-[460px]">
       <div id="galleryFade" class="gallery-fade"></div>
 
       <button id="prevVideo" class="side-arrow left" aria-label="Previous">‹</button>
 
       <div id="galleryTrack" class="gallery-track">
         <div class="video-slide">
-          <video playsinline preload="auto" muted autoplay>
+          <video playsinline preload="auto" muted>
             <source src="videos/Muks.mp4" type="video/mp4">
           </video>
           <div class="video-overlay">
@@ -681,22 +850,8 @@ input.form-input {
           </div>
         </div>
 
-            <!-- ADMIN modal -->
-            <div id="adminOverlay" class="overlay hidden">
-              <div class="modal" style="max-width:900px; width:95%;">
-                <div class="flex items-center justify-between mb-3">
-                  <h4 class="text-lg font-semibold">Admin Dashboard — Reported Chats</h4>
-                  <button id="closeAdmin" class="text-sm muted">✕</button>
-                </div>
-                <div id="adminContent" style="max-height:60vh; overflow:auto;"></div>
-                <div class="mt-3 text-right">
-                  <button id="adminRefresh" class="px-3 py-2 rounded-full bg-gray-100 text-gray-800">Refresh</button>
-                </div>
-              </div>
-            </div>
-
         <div class="video-slide">
-          <video playsinline preload="auto" muted autoplay>
+          <video playsinline preload="auto">
             <source src="videos/Osho.mp4" type="video/mp4">
           </video>
           <div class="video-overlay">
@@ -708,7 +863,7 @@ input.form-input {
         </div>
 
         <div class="video-slide">
-          <video playsinline preload="auto" muted autoplay>
+          <video playsinline preload="auto">
             <source src="videos/Piyush.mp4" type="video/mp4">
           </video>
           <div class="video-overlay">
@@ -720,7 +875,7 @@ input.form-input {
         </div>
 
         <div class="video-slide">
-          <video playsinline preload="auto" muted autoplay>
+          <video playsinline preload="auto">
             <source src="videos/Teacher.mp4" type="video/mp4">
           </video>
           <div class="video-overlay">
@@ -749,53 +904,23 @@ input.form-input {
   <section class="reveal">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Top Row: Realtime Chat and Share Your Experience -->
-      <div id="chatCard" class="card p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-        <!-- Chat Header -->
-        <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+      <div id="chatCard" class="card p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex flex-col">
+        <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">Realtime Chat</h3>
-            <p class="text-sm muted">Login to send messages.</p>
+            <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">💬 Community Chat</h3>
+            <p class="text-sm muted">Connect with other students - login to join the conversation.</p>
           </div>
-          <div class="flex items-center gap-3">
-            <button id="clearChatBtn" class="text-xs px-3 py-1 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors hidden" title="Admin only">Clear Chat</button>
-            <span class="inline-flex items-center gap-1">
-              <span class="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span class="text-xs font-medium text-green-600 dark:text-green-400">Live</span>
-            </span>
+          <div class="flex items-center gap-2">
+            <button id="clearChatBtn" class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Clear</button>
+            <div class="text-sm muted">🟢 Live</div>
           </div>
         </div>
 
-        <!-- Messages Container -->
-        <div id="chatWindow" class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"></div>
+        <div id="chatWindow" class="mt-4 p-3 rounded-md bg-gray-50 dark:bg-gray-900"></div>
 
-        <!-- Input Area -->
-        <div class="flex flex-col gap-3">
-          <div class="flex items-end gap-2">
-            <input 
-              id="messageInput" 
-              type="text"
-              class="form-input flex-1" 
-              placeholder="Type a message..."
-              autocomplete="off"
-            />
-            <div class="relative">
-              <button 
-                id="emojiBtn" 
-                type="button"
-                class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-lg leading-none"
-              >😊</button>
-              <div id="emojiPicker" class="hidden absolute bottom-12 right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg p-3 shadow-xl z-50" style="width:220px;">
-                <div class="grid grid-cols-6 gap-2" id="emojiList">
-                  <!-- emojis inserted by JS -->
-                </div>
-              </div>
-            </div>
-            <button 
-              id="sendBtn" 
-              type="button"
-              class="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all"
-            >Send</button>
-          </div>
+        <div class="mt-3 flex items-center gap-2">
+          <input id="messageInput" class="form-input" placeholder="Type a message..." />
+          <button id="sendBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Send</button>
         </div>
       </div>
 
@@ -828,21 +953,15 @@ input.form-input {
         <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">Reach Out For Help</h3>
         <p class="text-sm muted mt-2">If you'd like someone to contact you, fill out the form below.</p>
 
-  <form id="contactForm" class="grid grid-cols-1 gap-4 mt-4 flex-1" action="https://formsubmit.co/singhkrish.np@gmail.com" method="POST">
-          <!-- FormSubmit (https://formsubmit.co) will send submissions to singhkrish.np@gmail.com -->
-          <!-- Honeypot to reduce spam -->
-          <input type="text" name="_honey" style="display:none !important" tabindex="-1" autocomplete="off">
-          <!-- Disable FormSubmit captcha (optional) -->
+        <form id="contactForm" class="grid grid-cols-1 gap-4 mt-4 flex-1" action="https://formsubmit.co/singhkrish.np@gmail.com" method="POST">
           <input type="hidden" name="_captcha" value="false">
-          <!-- Optional: customize email subject -->
-          <input type="hidden" name="_subject" value="AmritaCare: New contact form submission">
+          <input type="hidden" name="_next" value="https://example.com/thank-you">
           <input name="name" placeholder="Your Name" class="form-input" required />
           <input name="email" type="email" placeholder="Your Email" class="form-input" required />
           <textarea name="message" rows="4" placeholder="How can we help?" class="form-input flex-1" required></textarea>
           <div class="text-right">
             <button type="submit" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Send</button>
           </div>
-          <div id="contactStatus" class="text-sm mt-2" aria-live="polite"></div>
         </form>
       </div>
 
@@ -960,7 +1079,7 @@ input.form-input {
 </main>
 
 <footer class="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 py-6">
-  <div class="max-w-6xl mx-auto px-4 text-sm muted text-center">© 2025 AmritaCare · <a href="admin.html" class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">Admin</a></div>
+  <div class="max-w-6xl mx-auto px-4 text-sm muted text-center">© 2025 Mental Health Demo</div>
 </footer>
 
 <!-- AUTH modal -->
@@ -983,7 +1102,7 @@ input.form-input {
 
     <!-- Signup -->
     <form id="signupForm" class="space-y-3 hidden">
-      <input id="signupName" placeholder="Name" class="form-input" required />
+      <input id="signupName" placeholder="Full name" class="form-input" required />
       <input id="signupEmail" type="email" placeholder="Email" class="form-input" required />
       <input id="signupPassword" type="password" placeholder="Password (min 6)" class="form-input" required />
       <div class="flex items-center justify-between">
@@ -1019,10 +1138,7 @@ input.form-input {
         <button id="changePasswordBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Change Password</button>
       </div>
       <div class="flex justify-between items-center">
-        <div class="flex items-center gap-2">
-          <button id="openAdminBtn" class="px-3 py-2 rounded-full bg-red-600 text-white font-semibold hidden">Admin Dashboard</button>
-          <button id="logoutBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Logout</button>
-        </div>
+        <button id="logoutBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Logout</button>
       </div>
     </div>
   </div>
@@ -1055,135 +1171,13 @@ function setCurrentUser(u){
   document.getElementById('profileBtn').classList.remove('hidden'); 
   document.getElementById('profileEmail').innerText = u.email; 
   document.getElementById('profileName').value = u.name || ''; 
-  // update UI gates (chat/share/contact) when user logs in
-  try{ updateAuthGates(); }catch(e){}
-  try{ updateAdminUI(); }catch(e){}
 }
 function getCurrentUser(){ try{ return JSON.parse(sessionStorage.getItem('mh_current')||'null'); }catch(e){ return null; } }
-function logout(showAlert){ 
+function logout(){ 
   sessionStorage.removeItem('mh_current'); 
   document.getElementById('profileBtn').classList.add('hidden'); 
   document.getElementById('loginBtn').classList.remove('hidden'); 
-  if(showAlert) alert('✅ Logged out successfully'); 
-  try{ updateAuthGates(); }catch(e){}
-  try{ updateAdminUI(); }catch(e){}
-}
-
-/* --- UI gating: enable/disable sections based on login state --- */
-function updateAuthGates(){
-  const user = getCurrentUser();
-  const logged = !!user;
-
-  // Chat controls — keep accessible but intercept interactions when not logged in
-  const messageInput = document.getElementById('messageInput');
-  const sendBtn = document.getElementById('sendBtn');
-  const clearChatBtn = document.getElementById('clearChatBtn');
-  if(messageInput){
-    messageInput.placeholder = logged ? 'Type a message...' : 'Login to send messages';
-    // focus/click should prompt login when not logged
-    if(!messageInput._authInterceptor){
-      messageInput.addEventListener('focus', ()=>{ if(!getCurrentUser()) openAuth('login'); });
-      messageInput._authInterceptor = true;
-    }
-  }
-  // helper to add a click interceptor that opens auth when not logged
-  function addClickInterceptor(el){
-    if(!el || el._authClickInterceptor) return;
-    el.addEventListener('click', (e)=>{
-      if(!getCurrentUser()){
-        e.preventDefault();
-        openAuth('login');
-      }
-    });
-    el._authClickInterceptor = true;
-  }
-  if(sendBtn){
-    sendBtn.title = logged ? '' : 'Login to send messages';
-    addClickInterceptor(sendBtn);
-  }
-  if(clearChatBtn){
-    clearChatBtn.title = logged ? '' : 'Login to clear messages';
-    // if logged in, ensure clearAllChats still works
-    if(!clearChatBtn._clearHandler){
-      clearChatBtn.addEventListener('click', (e)=>{ if(getCurrentUser()){ clearAllChats(); } });
-      clearChatBtn._clearHandler = true;
-    }
-    addClickInterceptor(clearChatBtn);
-  }
-
-  // Share experience controls
-  const shareSend = document.getElementById('shareSend');
-  const shareMessage = document.getElementById('shareMessage');
-  const shareFile = document.getElementById('shareFile');
-  const uploadLabel = document.getElementById('uploadLabel');
-  if(shareMessage) {
-    // focusing while logged out prompts login
-    if(!shareMessage._authInterceptor){
-      shareMessage.addEventListener('focus', ()=>{ if(!getCurrentUser()) openAuth('login'); });
-      shareMessage._authInterceptor = true;
-    }
-  }
-  if(shareFile){
-    // clicking file chooser should prompt login when not logged
-    if(!uploadLabel._authInterceptor){
-      uploadLabel.addEventListener('click', (e)=>{ if(!getCurrentUser()){ e.preventDefault(); openAuth('login'); } });
-      uploadLabel._authInterceptor = true;
-    }
-  }
-  if(shareSend){
-    shareSend.title = logged ? '' : 'Login to share your experience';
-    addClickInterceptor(shareSend);
-  }
-
-  // Contact form controls (Reach Out For Help)
-  const contactForm = document.getElementById('contactForm');
-  if(contactForm){
-    const emailInput = contactForm.querySelector('input[name="email"]');
-    
-    // Function to update contact form with user info
-    function updateContactFormWithUser(){
-      const user = getCurrentUser() || (window._firebase && window._firebase.auth && window._firebase.auth.currentUser);
-      if(user && user.email){
-        emailInput.value = user.email;
-        emailInput.disabled = true;
-        emailInput.style.opacity = '0.7';
-        emailInput.style.cursor = 'not-allowed';
-        emailInput.title = 'Email locked from your logged-in account';
-      } else {
-        emailInput.value = '';
-        emailInput.disabled = false;
-        emailInput.style.opacity = '';
-        emailInput.style.cursor = '';
-        emailInput.title = '';
-      }
-    }
-    
-    // Update on page load
-    updateContactFormWithUser();
-    
-    // Update when user interaction happens
-    contactForm.addEventListener('focusin', updateContactFormWithUser);
-    
-    // Also bind to auth state changes
-    window.addEventListener('loginSuccess', updateContactFormWithUser);
-    window.addEventListener('logoutSuccess', updateContactFormWithUser);
-    
-    // Intercept submit button
-    Array.from(contactForm.elements).forEach(el=>{
-      const tag = el.tagName;
-      if(tag === 'BUTTON' && el.type === 'submit'){
-        if(!el._authSubmitInterceptor){
-          el.addEventListener('click', (e)=>{ 
-            if(!getCurrentUser()){ 
-              e.preventDefault(); 
-              openAuth('login'); 
-            } 
-          });
-          el._authSubmitInterceptor = true;
-        }
-      }
-    });
-  }
+  alert('✅ Logged out successfully'); 
 }
 
 /* Email validation for institutional email */
@@ -1266,7 +1260,7 @@ document.getElementById('closeAuth').addEventListener('click', closeAuth);
 authOverlay.addEventListener('click', e=> { if(e.target===authOverlay) closeAuth(); });
 
 /* LOGIN */
-loginForm.addEventListener('submit', e=>{ if(window._useFirebaseAuth) return;
+loginForm.addEventListener('submit', e=>{
   e.preventDefault();
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const pwd = document.getElementById('loginPassword').value;
@@ -1279,13 +1273,6 @@ loginForm.addEventListener('submit', e=>{ if(window._useFirebaseAuth) return;
   
   if(!pwd || pwd.length < 6){
     alert('❌ Password must be at least 6 characters');
-    return;
-  }
-
-  // Check banned users
-  const banned = JSON.parse(localStorage.getItem(BANNED_STORAGE_KEY) || '[]');
-  if(banned.includes(email)){
-    alert('❌ This account has been banned. Please contact support.');
     return;
   }
   
@@ -1304,7 +1291,7 @@ loginForm.addEventListener('submit', e=>{ if(window._useFirebaseAuth) return;
 });
 
 /* SIGNUP SEND OTP */
-sendOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
+sendOtpBtn.addEventListener('click', ()=>{
   const name = document.getElementById('signupName').value.trim();
   const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const pwd = document.getElementById('signupPassword').value;
@@ -1343,7 +1330,7 @@ sendOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
   alert(`📨 OTP sent to ${email}\n\nSimulated OTP: ${otp}\n(In production, this would be sent via email)`);
 });
 
-verifyOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
+verifyOtpBtn.addEventListener('click', ()=>{
   const code = document.getElementById('otpInput').value.trim();
   if(!pendingSignup) {
     alert('❌ No signup in progress. Please start the signup process again.');
@@ -1383,7 +1370,7 @@ verifyOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
   loadChatHistory();
 });
 
-resendOtpBtn.addEventListener('click', ()=> { if(window._useFirebaseAuth) return; 
+resendOtpBtn.addEventListener('click', ()=> { 
   if(!pendingSignup) {
     alert('❌ No signup in progress.');
     return;
@@ -1405,7 +1392,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 
 profileBtn.addEventListener('click', ()=> profileOverlay.classList.remove('hidden'));
 closeProfile.addEventListener('click', ()=> profileOverlay.classList.add('hidden'));
-logoutBtn.addEventListener('click', async ()=> { try{ if(window._firebase && window._firebase.auth){ await window._firebase.auth.signOut(); } }catch(e){} logout(true); profileOverlay.classList.add('hidden'); });
+logoutBtn.addEventListener('click', ()=> { logout(); profileOverlay.classList.add('hidden'); });
 
 updateNameBtn.addEventListener('click', ()=>{
   const u = getCurrentUser(); 
@@ -1527,8 +1514,6 @@ window.addEventListener('load', ()=>{
       }
     });
   }
-  // Ensure gated UI reflects session state
-  try{ updateAuthGates(); }catch(e){}
 });
 
 /* VIDEO GALLERY - pixel-based loop + autoplay + overlay controls + indicators */
@@ -1547,32 +1532,33 @@ window.addEventListener('load', ()=>{
   let idx = 0, anim=false;
   const dots = [document.getElementById('dot0'), document.getElementById('dot1'), document.getElementById('dot2'), document.getElementById('dot3')];
   const fade = document.getElementById('galleryFade');
-  const viewport = document.getElementById('galleryViewport');
+
+  function slideWidth(){ return track.parentElement.getBoundingClientRect().width; }
+  function setPos(i){ const w=slideWidth(); track.style.transition='none'; track.style.transform = `translateX(-${(i+1)*w}px)`; }
+  function updateDots(){ dots.forEach((d,i)=>{ d.classList.toggle('active', i===idx); d.style.background = i===idx ? 'var(--dot-active)' : 'var(--dot-inactive)'; }); }
 
   // Dynamic container sizing based on video dimensions
+  const viewport = document.getElementById('galleryViewport');
   function updateContainerSize(){
     const children = Array.from(track.children);
     const currentIdx = idx + 1;
     const currentSlide = children[currentIdx];
-    if(!currentSlide) return;
-    
+    if(!currentSlide || !viewport) return;
     const video = currentSlide.querySelector('video');
     if(!video) return;
-    
+
     video.onloadedmetadata = ()=> {
       const videoWidth = video.videoWidth;
       const videoHeight = video.videoHeight;
       const viewportWidth = track.parentElement.getBoundingClientRect().width;
-      
-      // Calculate height to maintain aspect ratio
-      const aspectRatio = videoWidth / videoHeight;
-      const calculatedHeight = viewportWidth / aspectRatio;
-      
-      // Set viewport height
-      viewport.style.height = calculatedHeight + 'px';
-      viewport.style.minHeight = calculatedHeight + 'px';
+      if(videoWidth && videoHeight){
+        const aspectRatio = videoWidth / videoHeight;
+        const calculatedHeight = viewportWidth / aspectRatio;
+        viewport.style.height = calculatedHeight + 'px';
+        viewport.style.minHeight = calculatedHeight + 'px';
+      }
     };
-    
+
     // Also trigger if metadata already loaded
     if(video.readyState >= 1){
       const videoWidth = video.videoWidth;
@@ -1581,101 +1567,62 @@ window.addEventListener('load', ()=>{
         const viewportWidth = track.parentElement.getBoundingClientRect().width;
         const aspectRatio = videoWidth / videoHeight;
         const calculatedHeight = viewportWidth / aspectRatio;
-        
         viewport.style.height = calculatedHeight + 'px';
         viewport.style.minHeight = calculatedHeight + 'px';
       }
     }
   }
 
-  function slideWidth(){ return track.parentElement.getBoundingClientRect().width; }
-  function setPos(i){ const w=slideWidth(); track.style.transition='none'; track.style.transform = `translateX(-${(i+1)*w}px)`; }
-  function updateDots(){ dots.forEach((d,i)=>{ d.classList.toggle('active', i===idx); d.style.background = i===idx ? 'var(--dot-active)' : 'var(--dot-inactive)'; }); }
-
   // play visible — play current video with retry logic
   function playVisible(){
     const children = Array.from(track.children);
     const currentIdx = idx + 1;
-    
     children.forEach((child, i) => {
       const v = child.querySelector('video');
       if(!v) return;
-      
       try {
         if(i === currentIdx){
-          // This is the current video - play it
           v.muted = true;
           v.currentTime = 0;
-          
-          // Try to play with multiple fallback attempts
           const attemptPlay = () => {
             const playPromise = v.play();
             if(playPromise !== undefined){
               playPromise
                 .then(() => {
-                  console.log('Video playing successfully');
                   updateContainerSize();
                 })
                 .catch(err => {
-                  console.log('Play failed, retrying...', err);
-                  // Retry if play failed
-                  setTimeout(() => {
-                    v.play().catch(e => console.log('Final play attempt failed'));
-                  }, 100);
+                  setTimeout(() => { v.play().catch(()=>{}); }, 100);
                 });
             }
           };
-          
           attemptPlay();
         } else {
-          // Pause all other videos
           v.pause();
           v.currentTime = 0;
         }
-      } catch(e) {
-        console.log('Video control error:', e);
-      }
+      } catch(e) { }
     });
   }
 
   function goTo(target){
     if(anim) return;
-    anim = true; 
-    fade.classList.add('active');
+    anim = true; fade.classList.add('active');
     const w = slideWidth();
     const visual = target + 1;
     track.style.transition = 'transform .48s cubic-bezier(.2,.9,.12,1)';
     track.style.transform = `translateX(-${visual * w}px)`;
-    
     // pause all videos
-    Array.from(track.querySelectorAll('video')).forEach(v=>{ 
-      try{ v.pause(); v.currentTime = 0; }catch(e){} 
-    });
-    
+    Array.from(track.querySelectorAll('video')).forEach(v=>{ try{ v.pause(); }catch(e){} });
     const onEnd = ()=> {
       track.removeEventListener('transitionend', onEnd);
-      if(visual === 0){ 
-        track.style.transition='none'; 
-        track.style.transform = `translateX(-${N * w}px)`; 
-        target = N - 1; 
-      }
-      else if(visual === N + 1){ 
-        track.style.transition='none'; 
-        track.style.transform = `translateX(-${1 * w}px)`; 
-        target = 0; 
-      }
+      if(visual === 0){ track.style.transition='none'; track.style.transform = `translateX(-${N * w}px)`; target = N - 1; }
+      else if(visual === N + 1){ track.style.transition='none'; track.style.transform = `translateX(-${1 * w}px)`; target = 0; }
       idx = (target + N) % N;
       updateDots();
       updateContainerSize();
       fade.classList.remove('active');
-      
-      setTimeout(()=>{ 
-        anim=false;
-        // Multiple attempts to ensure play starts
-        playVisible();
-        setTimeout(() => { playVisible(); updateContainerSize(); }, 50);
-        setTimeout(() => { playVisible(); updateContainerSize(); }, 150);
-      }, 30);
+      setTimeout(()=>{ anim=false; playVisible(); }, 30);
     };
     track.addEventListener('transitionend', onEnd);
   }
@@ -1713,35 +1660,10 @@ window.addEventListener('load', ()=>{
     for(let i=1; i<=N; i++){
       const v = children[i].querySelector('video'); 
       if(!v) continue;
-      
-      // Clear old listeners to prevent duplicates
-      v.onended = null;
-      
-      // When video ends, go to next slide
-      v.addEventListener('ended', ()=> { 
-        if(idx === (i-1)){
-          goTo(((i-1)+1) % N); 
-        }
-      });
-      
-      // Update container size when video starts playing
-      v.addEventListener('play', ()=> {
-        if(idx === (i-1)){
-          updateContainerSize();
-        }
-      });
-      
-      // Update container size when metadata loads
-      v.addEventListener('loadedmetadata', ()=> {
-        if(idx === (i-1)){
-          updateContainerSize();
-        }
-      });
-      
-      // Force mute on current video
-      if(idx === (i-1)){
-        v.muted = true;
-      }
+      v.onended = ()=> { goTo(((i-1)+1) % N); };
+      v.addEventListener('play', ()=> { if(idx === (i-1)){ updateContainerSize(); } });
+      v.addEventListener('loadedmetadata', ()=> { if(idx === (i-1)){ updateContainerSize(); } });
+      if(idx === (i-1)) v.muted = true;
     }
   }
 
@@ -1810,153 +1732,81 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
   }
   
   const file = document.getElementById('shareFile').files[0];
-  let uploadedUrl = null;
-
-  if(file){
-    // Upload to Cloudinary using server-signed request
-    try{
-      const uploadResult = await uploadFileToCloudinarySigned(file);
-      uploadedUrl = uploadResult.secure_url || uploadResult.url || uploadResult.secureUrl || null;
-    }catch(err){
-      console.error('Cloudinary upload failed:', err);
-      alert('Upload failed. Sharing message without file.');
-      uploadedUrl = null;
+  const btn = document.getElementById('shareSend');
+  const originalText = btn.textContent;
+  
+  try {
+    // Upload file to Cloudinary if selected
+    let fileUrl = null;
+    if (file) {
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+      
+      const result = await uploadToCloudinary(file);
+      if (!result.success) {
+        alert(`❌ File upload failed: ${result.error}`);
+        btn.disabled = false;
+        btn.textContent = originalText;
+        return;
+      }
+      fileUrl = result.url;
     }
+    
+    // Store shared experience
+    const shares = JSON.parse(localStorage.getItem('mh_shared_experiences') || '[]');
+    shares.push({
+      user: user.name || user.email,
+      email: user.email,
+      message: t,
+      fileName: file ? file.name : null,
+      fileUrl: fileUrl, // Cloudinary URL
+      timestamp: Date.now(),
+      date: new Date().toISOString()
+    });
+    localStorage.setItem('mh_shared_experiences', JSON.stringify(shares));
+    
+    const fileInfo = file ? `\n✅ File uploaded to Cloudinary` : '';
+    alert(`✅ Experience shared successfully!${fileInfo}`);
+    
+    // Reset form
+    document.getElementById('shareMessage').value=''; 
+    document.getElementById('shareFile').value=''; 
+    document.getElementById('fileName').textContent='No file chosen';
+    
+  } catch (error) {
+    alert(`❌ Error: ${error.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
-
-  const fileInfo = uploadedUrl ? `\nUploaded: ${uploadedUrl}` : (file ? `\nFile: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB) - not uploaded` : '');
-
-  // Store shared experiences (optional)
-  const shares = JSON.parse(localStorage.getItem('mh_shared_experiences') || '[]');
-  shares.push({
-    user: user.name || user.email,
-    email: user.email,
-    message: t,
-    fileName: file ? file.name : null,
-    fileUrl: uploadedUrl,
-    timestamp: Date.now(),
-    date: new Date().toISOString()
-  });
-  localStorage.setItem('mh_shared_experiences', JSON.stringify(shares));
-
-  alert(`✅ Experience shared successfully!${fileInfo}`);
-  document.getElementById('shareMessage').value=''; 
-  document.getElementById('shareFile').value=''; 
-  document.getElementById('fileName').textContent='No file chosen';
 });
 
-
-// Helper: upload file to Cloudinary using server-signed signature
-async function uploadFileToCloudinarySigned(file){
-  // Request signature from our server
-  const sigResp = await fetch('/api/cloudinary-sign', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ filename: file.name }) });
-  if(!sigResp.ok) throw new Error('Signature request failed');
-  const sigData = await sigResp.json();
-  const cloudName = sigData.cloud_name;
-  const apiKey = sigData.api_key;
-  const timestamp = sigData.timestamp;
-  const signature = sigData.signature;
-
-  const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url);
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('api_key', apiKey);
-    fd.append('timestamp', timestamp);
-    fd.append('signature', signature);
-    // Optional: transformations
-    fd.append('transformation', JSON.stringify([{ width: 1600, crop: 'limit' }]));
-
-    xhr.upload.onprogress = function(e){
-      if(e.lengthComputable){
-        const pct = Math.round((e.loaded / e.total) * 100);
-        // show minimal feedback
-        fileNameEl.textContent = `Uploading: ${pct}%`;
-      }
-    };
-
-    xhr.onload = function(){
-      if(xhr.status >= 200 && xhr.status < 300){
-        try{ const resp = JSON.parse(xhr.responseText); resolve(resp); }catch(e){ reject(e); }
-      } else {
-        reject(new Error('Upload failed: ' + xhr.statusText));
-      }
-    };
-
-    xhr.onerror = function(){ reject(new Error('Upload network error')); };
-    xhr.send(fd);
-  });
-}
-
-/* CONTACT FORM */
+/* CONTACT FORM - FormSubmit.io Integration */
 document.getElementById('contactForm').addEventListener('submit', e=> { 
-  e.preventDefault();
+  // FormSubmit.io handles everything, we just show confirmation
+  const button = e.target.querySelector('button[type="submit"]');
+  button.disabled = true;
+  button.textContent = 'Sending...';
   
-  const formData = new FormData(e.target);
-  const name = formData.get('name').trim();
-  const email = formData.get('email').trim().toLowerCase();
-  const message = formData.get('message').trim();
-  
-  // Validate required fields
-  if(!name || !email || !message){
-    alert('❌ Please fill in all fields');
-    return;
+  // FormSubmit.io will submit the form automatically
+  // After submission, it redirects to the _next URL or shows success
+});
+
+// Show success message if returning from FormSubmit
+window.addEventListener('load', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  if(urlParams.has('success')) {
+    alert('✅ Your message has been sent successfully! We will get back to you soon.');
   }
-  
-  // Validate institutional email
-  if(!validateInstitutionalEmail(email)){
-    alert(`❌ Invalid email format.\n\nPlease use your institutional email: @${INSTITUTIONAL_EMAIL_DOMAIN}\n\nExample: yourname@${INSTITUTIONAL_EMAIL_DOMAIN}`);
-    return;
-  }
-  
-  // Store contact submissions
-  const contacts = JSON.parse(localStorage.getItem('mh_contact_submissions') || '[]');
-  contacts.push({
-    name,
-    email,
-    message,
-    timestamp: Date.now(),
-    date: new Date().toISOString()
-  });
-  localStorage.setItem('mh_contact_submissions', JSON.stringify(contacts));
-  
-  // Send to FormSubmit via AJAX (FormSubmit supports CORS)
-  const statusEl = document.getElementById('contactStatus');
-  statusEl.textContent = 'Sending...';
-  fetch('https://formsubmit.co/ajax/singhkrish.np@gmail.com', {
-    method: 'POST',
-    body: formData,
-    headers: { 'Accept': 'application/json' }
-  }).then(r=>r.json()).then(j=>{
-    if(j.success){
-      statusEl.textContent = '✅ Message sent — we will get back to you soon.';
-      e.target.reset();
-    } else {
-      statusEl.textContent = '⚠️ Failed to send email; saved locally.';
-    }
-  }).catch(err=>{
-    console.error('FormSubmit error', err);
-    statusEl.textContent = '⚠️ Network error — message saved locally.';
-  });
 });
 
 /* CHAT: Real-time chat functionality */
 const CHAT_STORAGE_KEY = 'mh_chat_messages';
-const REPORTS_STORAGE_KEY = 'mh_reported_chats';
-const ADMINS_STORAGE_KEY = 'mh_admins';
-const BANNED_STORAGE_KEY = 'mh_banned_users';
-const DEFAULT_ADMINS = ['admin@bl.students.amrita.edu'];
 let chatMessages = [];
 
 function loadChatHistory(){
   try{
     chatMessages = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
-    // ensure we only keep last 30 visible messages
-    if(chatMessages.length > 30) chatMessages = chatMessages.slice(-30);
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
     renderChatMessages();
   } catch(e){
     chatMessages = [];
@@ -1964,12 +1814,10 @@ function loadChatHistory(){
 }
 
 function saveChatMessage(msg){
-  // add unique id
-  msg.id = msg.id || ('m_' + Date.now() + '_' + Math.random().toString(36).slice(2,8));
   chatMessages.push(msg);
-  // Keep only last 30 messages visible
-  if(chatMessages.length > 30){
-    chatMessages = chatMessages.slice(-30);
+  // Keep only last 100 messages
+  if(chatMessages.length > 100){
+    chatMessages = chatMessages.slice(-100);
   }
   localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
   renderChatMessages();
@@ -1978,79 +1826,27 @@ function saveChatMessage(msg){
 function renderChatMessages(){
   const w = document.getElementById('chatWindow');
   w.innerHTML = '';
-
+  
   if(chatMessages.length === 0){
     w.innerHTML = '<div class="text-center text-sm muted py-8">No messages yet. Start the conversation!</div>';
     return;
   }
-
+  
   chatMessages.forEach(msg => {
+    const el = document.createElement('div');
     const user = getCurrentUser();
     const isOwn = user && msg.email === user.email;
-    const reported = msg.reported || false;
-
-    // Create message container
-    const container = document.createElement('div');
-    container.className = isOwn ? 'chat-message-own' : 'chat-message-other';
-
-    // Create avatar
-    const avatar = document.createElement('div');
-    avatar.className = 'chat-avatar';
-    const initials = (msg.from || '').split(' ').map(s=>s[0]||'').slice(0,2).join('').toUpperCase();
-    avatar.textContent = initials || msg.from?.charAt(0)?.toUpperCase() || 'U';
-
-    // Create content wrapper
-    const content = document.createElement('div');
-    content.className = 'chat-content';
-
-    // Create header (name + time)
-    const header = document.createElement('div');
-    header.className = 'chat-header';
-    header.innerHTML = `<strong>${escapeHtml(msg.from)}</strong> <span class="chat-time">${escapeHtml(msg.ts)}</span>`;
-
-    // Create message bubble
-    const bubble = document.createElement('div');
-    bubble.className = isOwn ? 'chat-bubble-own' : 'chat-bubble-other';
-    bubble.innerHTML = `<div class="text-sm">${escapeHtml(msg.text)}</div>`;
-
-    // Create actions (report button)
-    const actions = document.createElement('div');
-    actions.className = 'chat-actions';
-    const reportBtn = document.createElement('button');
-    reportBtn.type = 'button';
-    reportBtn.className = 'report-btn';
-    reportBtn.textContent = reported ? '✓ Reported' : 'Report';
-    reportBtn.dataset.id = msg.id;
-    actions.appendChild(reportBtn);
-
-    // Build content structure
-    content.appendChild(header);
-    content.appendChild(bubble);
-    content.appendChild(actions);
-
-    // Add avatar and content to container
-    if(isOwn){
-      container.appendChild(content);
-      container.appendChild(avatar);
-    } else {
-      container.appendChild(avatar);
-      container.appendChild(content);
-    }
-
-    w.appendChild(container);
+    el.className = `p-3 rounded-md mb-2 ${isOwn ? 'bg-indigo-100 dark:bg-indigo-900/30 ml-auto max-w-[80%]' : 'bg-white dark:bg-gray-900'}`;
+    el.innerHTML = `
+      <div class="text-xs muted flex items-center gap-2">
+        <span class="font-semibold">${escapeHtml(msg.from)}</span>
+        <span>•</span>
+        <span>${msg.ts}</span>
+      </div>
+      <div class="mt-1 text-sm">${escapeHtml(msg.text)}</div>
+    `;
+    w.appendChild(el);
   });
-
-  // Attach report handlers
-  Array.from(w.querySelectorAll('.report-btn')).forEach(b=>{
-    b.addEventListener('click', (e)=>{
-      e.preventDefault();
-      const id = b.dataset.id;
-      if(!getCurrentUser()){ openAuth('login'); return; }
-      reportChat(id);
-    });
-  });
-
-  // Keep scroll at bottom
   w.scrollTop = w.scrollHeight;
 }
 
@@ -2071,41 +1867,8 @@ sendBtn.addEventListener('click', ()=>{
   sendChatMessage();
 });
 
-clearChatBtn.addEventListener('click', async ()=>{
-  if(!window._firebase || !window._firebase.auth) { clearAllChats(); return; }
-  const user = window._firebase.auth.currentUser;
-  const isAdmin = user ? await checkIsAdmin(user.uid) : false;
-  if(!isAdmin){ alert('Only admins can clear chat.'); return; }
-  if(!confirm('Clear all chats? This cannot be undone.')) return;
-  // delete all chats from Firestore using v12 modular API
-  try{
-    const { writeBatch, getDocs, collection, deleteDoc, doc } = window._firebase.db.__firestore || {};
-    const db = window._firebase.db;
-    // Import writeBatch from module scope (need to use imported function)
-    // For now, use the alternative: delete each doc individually or use REST API
-    // Since we can't access writeBatch directly, let's iterate and delete
-    const chatsRef = collection(db, 'chats');
-    const snapshot = await getDocs(chatsRef);
-    const batch = writeBatch(db);
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-    await batch.commit();
-    alert('Chats cleared');
-  }catch(e){ 
-    console.error('Clear error:', e); 
-    // Fallback: try individual deletes
-    try{
-      const { getDocs, collection, deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js");
-      const db = window._firebase.db;
-      const chatsRef = collection(db, 'chats');
-      const snapshot = await getDocs(chatsRef);
-      for(const d of snapshot.docs){
-        await deleteDoc(d.ref);
-      }
-      alert('Chats cleared');
-    }catch(e2){ console.error(e2); alert('Failed to clear. Check Firestore setup.'); }
-  }
+clearChatBtn.addEventListener('click', ()=>{
+  clearAllChats();
 });
 
 messageInput.addEventListener('keypress', (e)=>{
@@ -2122,13 +1885,6 @@ function sendChatMessage(){
     openAuth('login'); 
     return;
   }
-  // check banned
-  const banned = JSON.parse(localStorage.getItem(BANNED_STORAGE_KEY) || '[]');
-  if(banned.includes(user.email)){
-    alert('Your account has been banned from sending messages.');
-    logout();
-    return;
-  }
   
   const txt = messageInput.value.trim();
   if(!txt) return;
@@ -2138,177 +1894,15 @@ function sendChatMessage(){
     email: user.email,
     text: txt,
     ts: new Date().toLocaleTimeString(),
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    isUser: true
   };
   
   saveChatMessage(msg);
   messageInput.value = '';
   
-  // Simulate receiving a response (optional - can be removed)
-  setTimeout(() => {
-    if(Math.random() > 0.7){ // 30% chance of auto-response
-      const responses = [
-        'Thank you for sharing!',
-        'We appreciate your message.',
-        'Your message has been received.',
-        'Thank you for reaching out!'
-      ];
-      const autoMsg = {
-        from: 'Support Team',
-        email: 'support@bl.students.amrita.edu',
-        text: responses[Math.floor(Math.random() * responses.length)],
-        ts: new Date().toLocaleTimeString(),
-        timestamp: Date.now()
-      };
-      saveChatMessage(autoMsg);
-    }
-  }, 1000);
+  // Real-time user-to-user chat - no AI responses needed!
 }
-
-/* Emoji picker: populate and bind emoji insertion */
-(function(){
-  const emojiBtn = document.getElementById('emojiBtn');
-  const emojiPicker = document.getElementById('emojiPicker');
-  const emojiList = document.getElementById('emojiList');
-  const input = document.getElementById('messageInput');
-  if(!emojiBtn || !emojiPicker || !emojiList || !input) return;
-
-  const emojis = ['😀','😁','😂','🤣','😊','😍','😢','😮','😡','👍','👎','🙏','🎉','❤️','🔥','😴','🤔','🙌','😅','😇','🤝','👏','🤗','😎','😜','😬','😕','🤩','💯','✔️'];
-  emojis.forEach(e => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'text-xl p-1';
-    b.style.border = 'none';
-    b.style.background = 'transparent';
-    b.textContent = e;
-    b.addEventListener('click', (ev)=>{
-      ev.preventDefault();
-      // require login to insert
-      if(!getCurrentUser()){ openAuth('login'); return; }
-      insertAtCursor(input, e);
-      emojiPicker.classList.add('hidden');
-      input.focus();
-    });
-    emojiList.appendChild(b);
-  });
-
-  emojiBtn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    if(!getCurrentUser()){ openAuth('login'); return; }
-    emojiPicker.classList.toggle('hidden');
-  });
-
-  // close when clicking outside
-  document.addEventListener('click', ()=>{ emojiPicker.classList.add('hidden'); });
-  emojiPicker.addEventListener('click', (e)=> e.stopPropagation());
-
-  function insertAtCursor(field, value){
-    try{
-      const start = field.selectionStart || 0;
-      const end = field.selectionEnd || 0;
-      const text = field.value || '';
-      field.value = text.slice(0,start) + value + text.slice(end);
-      const pos = start + value.length;
-      field.selectionStart = field.selectionEnd = pos;
-    }catch(e){ field.value = (field.value || '') + value; }
-  }
-})();
-
-/* ----------------- Reporting / Admin / Banning ----------------- */
-function getAdmins(){
-  try{ const a = JSON.parse(localStorage.getItem(ADMINS_STORAGE_KEY) || 'null'); return Array.isArray(a) && a.length ? a : DEFAULT_ADMINS.slice(); }catch(e){ return DEFAULT_ADMINS.slice(); }
-}
-function isAdmin(email){ if(!email) return false; return getAdmins().includes(email.toLowerCase()); }
-
-function getBanned(){ try{ return JSON.parse(localStorage.getItem(BANNED_STORAGE_KEY) || '[]'); }catch(e){ return []; } }
-function isBanned(email){ const b = getBanned(); return b.includes((email||'').toLowerCase()); }
-function addBan(email){ if(!email) return; const b = getBanned(); if(!b.includes(email.toLowerCase())){ b.push(email.toLowerCase()); localStorage.setItem(BANNED_STORAGE_KEY, JSON.stringify(b)); } }
-
-function reportChat(msgId){
-  const msg = chatMessages.find(m=>m.id===msgId);
-  if(!msg) return alert('Message not found');
-  // mark in chatMessages
-  msg.reported = true;
-  // store report
-  const reports = JSON.parse(localStorage.getItem(REPORTS_STORAGE_KEY) || '[]');
-  reports.push({ id: 'r_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), msgId: msg.id, text: msg.text, from: msg.from, email: msg.email, ts: msg.ts, reportedAt: Date.now() });
-  localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
-  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
-  renderChatMessages();
-  alert('✅ Message reported. Admins will review it.');
-}
-
-function loadReportedChats(){
-  try{ return JSON.parse(localStorage.getItem(REPORTS_STORAGE_KEY) || '[]'); }catch(e){ return []; }
-}
-
-function renderAdminContent(){
-  const container = document.getElementById('adminContent');
-  if(!container) return;
-  const reports = loadReportedChats();
-  if(reports.length===0){ container.innerHTML = '<div class="text-sm muted py-6">No reported chats.</div>'; return; }
-  container.innerHTML = '';
-  reports.forEach(r=>{
-    const row = document.createElement('div');
-    row.className = 'p-3 mb-3 border rounded';
-    row.innerHTML = `
-      <div class="text-sm font-semibold">${escapeHtml(r.from)} <span class="text-xs muted">(${escapeHtml(r.email)})</span></div>
-      <div class="text-xs muted">${new Date(r.reportedAt).toLocaleString()} — original: ${escapeHtml(r.ts)}</div>
-      <div class="mt-2 text-sm">${escapeHtml(r.text)}</div>
-      <div class="mt-3 flex gap-2">
-        <button class="admin-delete px-2 py-1 rounded bg-red-600 text-white" data-msg="${r.msgId}" data-report="${r.id}">Delete Chat</button>
-        <button class="admin-ban px-2 py-1 rounded bg-gray-800 text-white" data-email="${escapeHtml(r.email)}">Ban User</button>
-        <button class="admin-dismiss px-2 py-1 rounded bg-gray-200" data-report="${r.id}">Dismiss</button>
-      </div>
-    `;
-    container.appendChild(row);
-  });
-  // bind actions
-  Array.from(container.querySelectorAll('.admin-delete')).forEach(b=> b.addEventListener('click', ()=>{
-    const msgId = b.dataset.msg; const reportId = b.dataset.report;
-    if(!confirm('Delete this chat for everyone?')) return;
-    // remove chat
-    chatMessages = chatMessages.filter(m=>m.id!==msgId);
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
-    // remove report
-    let reports = loadReportedChats(); reports = reports.filter(r=>r.id!==reportId); localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
-    renderAdminContent(); renderChatMessages();
-  }));
-  Array.from(container.querySelectorAll('.admin-ban')).forEach(b=> b.addEventListener('click', ()=>{
-    const email = b.dataset.email;
-    if(!confirm('Ban user '+email+'? This will prevent them from logging in or sending messages.')) return;
-    addBan(email);
-    // remove their chats
-    chatMessages = chatMessages.filter(m=>m.email !== email);
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
-    // remove related reports
-    let reports = loadReportedChats(); reports = reports.filter(r=>r.email !== email); localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
-    renderAdminContent(); renderChatMessages();
-    // if banned user is currently logged in, log them out
-    const cur = getCurrentUser(); if(cur && cur.email === email){ logout(); alert('Banned user was logged out.'); }
-  }));
-  Array.from(container.querySelectorAll('.admin-dismiss')).forEach(b=> b.addEventListener('click', ()=>{
-    const reportId = b.dataset.report; let reports = loadReportedChats(); reports = reports.filter(r=>r.id!==reportId); localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports)); renderAdminContent();
-  }));
-}
-
-function updateAdminUI(){
-  const cur = getCurrentUser();
-  const openAdminBtn = document.getElementById('openAdminBtn');
-  const adminOverlay = document.getElementById('adminOverlay');
-  if(openAdminBtn){
-    if(cur && isAdmin(cur.email)){ openAdminBtn.classList.remove('hidden'); } else { openAdminBtn.classList.add('hidden'); }
-    openAdminBtn.onclick = ()=>{
-      // Redirect to dedicated admin dashboard
-      window.location.href = 'admin.html';
-    };
-  }
-  const closeAdmin = document.getElementById('closeAdmin'); if(closeAdmin) closeAdmin.onclick = ()=> adminOverlay.classList.add('hidden');
-  const adminRefresh = document.getElementById('adminRefresh'); if(adminRefresh) adminRefresh.onclick = ()=> renderAdminContent();
-}
-
-// initialize admin UI on load
-try{ updateAdminUI(); }catch(e){}
 
 /* small escape util */
 function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
@@ -2467,212 +2061,6 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
   }
 })();
 
-</script>
-
-<script type="module">
-  // Firebase integration: Auth + Firestore for chat, reports, admin
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, doc, setDoc, getDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, limit, where } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
-
-  // Fetch Firebase config from server (kept out of public code for security)
-  let firebaseConfig = null;
-  try {
-    const response = await fetch('/api/firebase-config');
-    firebaseConfig = await response.json();
-  } catch (err) {
-    console.error('Failed to fetch Firebase config:', err);
-    firebaseConfig = null;
-  }
-
-  if (!firebaseConfig) {
-    console.warn('Firebase not configured. Local auth will be used.');
-    window._useFirebaseAuth = false;
-  } else {
-    const app = initializeApp(firebaseConfig);
-    // indicate Firebase handlers are active so legacy local handlers skip
-    window._useFirebaseAuth = true;
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    // expose firebase objects for legacy handlers
-    window._firebase = { app, auth, db };
-
-  // listeners / state
-  let unsubscribeChats = null;
-  let unsubscribeReports = null;
-
-  // helper to convert Firestore timestamp
-  function formatTs(ts){ try{ if(!ts) return ''; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleTimeString(); }catch(e){ return ''; } }
-
-  // Override sendChatMessage to write to Firestore
-  window.sendChatMessage = async function(){
-    const user = auth.currentUser;
-    if(!user){ openAuth('login'); return; }
-    // check banned
-    const bannedDoc = await getDoc(doc(db,'banned', user.uid));
-    if(bannedDoc.exists()){
-      alert('Your account has been banned.');
-      await signOut(auth);
-      return;
-    }
-    const txt = document.getElementById('messageInput').value.trim();
-    if(!txt) return;
-    try{
-      await addDoc(collection(db,'chats'), {
-        uid: user.uid,
-        from: user.displayName || user.email.split('@')[0],
-        email: user.email,
-        text: txt,
-        timestamp: serverTimestamp()
-      });
-      document.getElementById('messageInput').value='';
-    }catch(err){ console.error(err); alert('Failed to send message'); }
-  };
-
-  // start listening to latest 30 chats
-  function startChatListener(){
-    if(unsubscribeChats) return;
-    const q = query(collection(db,'chats'), orderBy('timestamp','desc'), limit(30));
-    unsubscribeChats = onSnapshot(q, snap => {
-      const msgs = [];
-      snap.forEach(d => { const data = d.data(); msgs.push({ id: d.id, from: data.from, email: data.email, text: data.text, ts: formatTs(data.timestamp), timestamp: data.timestamp, uid: data.uid, reported: data.reported||false }); });
-      // reverse to show oldest first
-      msgs.reverse();
-      window.chatMessages = msgs;
-      renderChatMessages();
-    }, err=> console.error('chat listener',err));
-  }
-
-  function stopChatListener(){ if(unsubscribeChats){ unsubscribeChats(); unsubscribeChats = null; } }
-
-  // report chat -> add to reports collection and mark chat
-  window.reportChat = async function(msgId){
-    const user = auth.currentUser; if(!user){ openAuth('login'); return; }
-    try{
-      const chatRef = doc(db,'chats', msgId);
-      const chatSnap = await getDoc(chatRef);
-      if(!chatSnap.exists()){ alert('Message not found'); return; }
-      const data = chatSnap.data();
-      await addDoc(collection(db,'reports'), { msgId, chatText: data.text, from: data.from, email: data.email, uid: data.uid || null, reportedBy: user.email, reportedAt: serverTimestamp() });
-      await setDoc(chatRef, { reported: true }, { merge: true });
-      alert('Reported. Admins will review.');
-    }catch(err){ console.error(err); alert('Report failed'); }
-  };
-
-  // Admin: listen to reports
-  function startReportsListener(){
-    if(unsubscribeReports) return;
-    const q = query(collection(db,'reports'), orderBy('reportedAt','desc'));
-    unsubscribeReports = onSnapshot(q, snap => {
-      const rows = [];
-      snap.forEach(d=> rows.push({ id: d.id, ...d.data() }));
-      // render admin content
-      const container = document.getElementById('adminContent');
-      if(!container) return;
-      if(rows.length===0){ container.innerHTML = '<div class="text-sm muted py-6">No reported chats.</div>'; return; }
-      container.innerHTML = '';
-      rows.forEach(r=>{
-        const row = document.createElement('div');
-        row.className = 'p-3 mb-3 border rounded';
-        row.innerHTML = `
-          <div class="text-sm font-semibold">${escapeHtml(r.from)} <span class="text-xs muted">(${escapeHtml(r.email)})</span></div>
-          <div class="text-xs muted">${new Date((r.reportedAt && r.reportedAt.toDate) ? r.reportedAt.toDate() : Date.now()).toLocaleString()}</div>
-          <div class="mt-2 text-sm">${escapeHtml(r.chatText)}</div>
-          <div class="mt-3 flex gap-2">
-            <button class="admin-delete px-2 py-1 rounded bg-red-600 text-white" data-msg="${escapeHtml(r.msgId)}" data-report="${r.id}">Delete Chat</button>
-            <button class="admin-ban px-2 py-1 rounded bg-gray-800 text-white" data-email="${escapeHtml(r.email)}" data-uid="${escapeHtml(r.uid||'')}">Ban User</button>
-            <button class="admin-dismiss px-2 py-1 rounded bg-gray-200" data-report="${r.id}">Dismiss</button>
-          </div>
-        `;
-        container.appendChild(row);
-      });
-      // bind actions
-      Array.from(container.querySelectorAll('.admin-delete')).forEach(b=> b.addEventListener('click', async ()=>{
-        const msgId = b.dataset.msg; const reportId = b.dataset.report;
-        if(!confirm('Delete this chat for everyone?')) return;
-        try{ await deleteDoc(doc(db,'chats',msgId)); await deleteDoc(doc(db,'reports',reportId)); alert('Deleted'); }
-        catch(e){ console.error(e); alert('Failed to delete'); }
-      }));
-      Array.from(container.querySelectorAll('.admin-ban')).forEach(b=> b.addEventListener('click', async ()=>{
-        const email = b.dataset.email; const uid = b.dataset.uid;
-        if(!confirm('Ban user '+email+'?')) return;
-        try{
-          if(uid){ await setDoc(doc(db,'banned', uid), { email, bannedAt: serverTimestamp() }); }
-          else { await addDoc(collection(db,'banned'), { email, bannedAt: serverTimestamp() }); }
-          // remove chat & related reports
-          // admin will see changes via listeners
-          alert('User banned.');
-        }catch(e){ console.error(e); alert('Failed to ban'); }
-      }));
-      Array.from(container.querySelectorAll('.admin-dismiss')).forEach(b=> b.addEventListener('click', async ()=>{
-        const reportId = b.dataset.report; try{ await deleteDoc(doc(db,'reports', reportId)); }catch(e){ console.error(e); }
-      }));
-    }, err=> console.error('reports listener', err));
-  }
-  function stopReportsListener(){ if(unsubscribeReports){ unsubscribeReports(); unsubscribeReports=null; } }
-
-  // admin check: check 'admins' collection document with uid
-  window.checkIsAdmin = async function(uid){ if(!uid) return false; const snap = await getDoc(doc(db,'admins', uid)); return snap.exists(); };
-  async function checkIsAdmin(uid){ if(!uid) return false; const snap = await getDoc(doc(db,'admins', uid)); return snap.exists(); }
-
-  // on auth state change
-  onAuthStateChanged(auth, async (user) => {
-    if(user){
-      // check banned
-      const bannedSnap = await getDoc(doc(db,'banned', user.uid));
-      if(bannedSnap.exists()){
-        alert('Your account is banned.'); await signOut(auth); return; }
-      // check if admin - redirect to admin dashboard if true
-      const isAdmin = await checkIsAdmin(user.uid);
-      if(isAdmin){
-        // Redirect to admin dashboard
-        window.location.href = 'admin.html';
-        return;
-      }
-      // load user profile
-      let name = user.displayName || '';
-      try{ const ud = await getDoc(doc(db,'users', user.uid)); if(ud.exists() && ud.data().name) name = ud.data().name; }catch(e){}
-      setCurrentUser({ uid: user.uid, email: user.email, name });
-      // start listeners
-      startChatListener();
-      // show clear button (should be hidden since not admin, but keep for future)
-      const clearChatBtn = document.getElementById('clearChatBtn');
-      if(clearChatBtn){ clearChatBtn.classList.add('hidden'); }
-    } else {
-      // logged out - silently clear, don't show alert on page load
-      logout(false);
-      stopChatListener(); stopReportsListener();
-    }
-  });
-
-  // replace login/signup behavior to use Firebase (override previous handlers)
-  try{
-    const _loginForm = document.getElementById('loginForm');
-    if(_loginForm){ _loginForm.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-      const pwd = document.getElementById('loginPassword').value;
-      if(!email || !pwd){ alert('Enter email and password'); return; }
-      try{ await signInWithEmailAndPassword(auth, email, pwd); closeAuth(); alert('Logged in'); }
-      catch(err){ console.error(err); alert('Login failed: '+err.message); }
-    }); }
-
-    const _signupForm = document.getElementById('signupForm');
-    if(_signupForm){ _signupForm.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const name = document.getElementById('signupName').value.trim();
-      const email = document.getElementById('signupEmail').value.trim().toLowerCase();
-      const pwd = document.getElementById('signupPassword').value;
-      if(!name || !email || !pwd){ alert('Fill all fields'); return; }
-      try{
-        const cred = await createUserWithEmailAndPassword(auth, email, pwd);
-        await updateProfile(cred.user, { displayName: name });
-        await setDoc(doc(db,'users', cred.user.uid), { name, email, createdAt: serverTimestamp() });
-        closeAuth(); alert('Account created and logged in');
-      }catch(err){ console.error(err); alert('Signup failed: '+err.message); }
-    }); }
-  }catch(e){ console.error('setup auth handlers', e); }
-  }
 </script>
 </body>
 </html>
