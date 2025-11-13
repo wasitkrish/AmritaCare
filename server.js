@@ -73,7 +73,7 @@ app.post('/api/messages', async (req, res) => {
     const { from, email, text, timestamp } = req.body || {};
     if(!from || !email || !text) return res.status(400).json({ error: 'Missing required fields: from, email, text' });
 
-    const msg = { from, email, text, timestamp: timestamp || Date.now(), ts: new Date().toLocaleTimeString(), id: Date.now() };
+    let msg = { from, email, text, timestamp: timestamp || Date.now(), ts: new Date().toLocaleTimeString(), id: Date.now() };
     _chatMessages.push(msg);
     if(_chatMessages.length > 500) _chatMessages = _chatMessages.slice(-500);
     // best-effort persist to env
@@ -82,7 +82,13 @@ app.post('/api/messages', async (req, res) => {
     // If Admin SDK configured, persist into Firestore 'chats' collection for production persistence
     if(_adminDb){
       try{
-        await _adminDb.collection('chats').add({ from: msg.from, email: msg.email, text: msg.text, timestamp: admin.firestore.FieldValue.serverTimestamp() });
+        const docRef = await _adminDb.collection('chats').add({ from: msg.from, email: msg.email, text: msg.text, timestamp: admin.firestore.FieldValue.serverTimestamp() });
+        // Use Firestore doc id as canonical id when available
+        if(docRef && docRef.id){
+          msg.id = docRef.id;
+          // update in-memory store to reflect canonical id
+          _chatMessages[_chatMessages.length-1] = msg;
+        }
       }catch(e){ console.warn('Failed to persist message to Firestore via Admin SDK', e); }
     }
 
@@ -91,7 +97,22 @@ app.post('/api/messages', async (req, res) => {
 });
 
 app.get('/api/messages', (req, res) => {
-  try{ return res.json({ success: true, messages: _chatMessages.slice(-30), count: _chatMessages.length }); }
+  try{
+    // If Admin SDK is configured, read the latest 30 messages from Firestore for canonical data
+    if(_adminDb){
+      return _adminDb.collection('chats').orderBy('timestamp','desc').limit(30).get().then(snapshot => {
+        const msgs = [];
+        snapshot.forEach(d => {
+          const data = d.data();
+          msgs.push({ id: d.id, from: data.from || null, email: data.email || null, text: data.text || null, ts: (data.timestamp && data.timestamp.toDate) ? data.timestamp.toDate().toLocaleTimeString() : '', timestamp: data.timestamp ? (data.timestamp.seconds ? data.timestamp.seconds * 1000 : Date.now()) : Date.now() });
+        });
+        // reverse to oldest-first
+        msgs.reverse();
+        return res.json({ success: true, messages: msgs, count: msgs.length });
+      }).catch(err => { console.error('❌ /api/messages GET firestore error', err); return res.status(500).json({ success: false, messages: [], count: 0 }); });
+    }
+    return res.json({ success: true, messages: _chatMessages.slice(-30), count: _chatMessages.length });
+  }
   catch(err){ console.error('❌ /api/messages GET error', err); return res.status(500).json({ success: false, messages: [], count: 0 }); }
 });
 

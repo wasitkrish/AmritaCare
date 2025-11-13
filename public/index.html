@@ -2757,7 +2757,8 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
   // Firebase integration: Auth + Firestore for chat, reports, admin
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, doc, setDoc, getDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, limit, where } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+  import { getFirestore, initializeFirestore, collection, addDoc, doc, setDoc, getDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, limit, where } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+  import { persistentLocalCache } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
   // Fetch Firebase config from server (kept out of public code for security)
   let firebaseConfig = null;
@@ -2785,7 +2786,9 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     // indicate Firebase handlers are active so legacy local handlers skip
     window._useFirebaseAuth = true;
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    // Initialize Firestore with persistent local cache for offline support and faster loads
+    const db = initializeFirestore(app, { localCache: persistentLocalCache() });
+    console.log('[DEBUG] Firestore initialized with persistent local cache');
     // expose firebase objects for legacy handlers
     window._firebase = { app, auth, db };
     console.log('[DEBUG] window._firebase set', !!window._firebase && !!window._firebase.auth && !!window._firebase.db);
@@ -2865,63 +2868,44 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       }
     }catch(e){ console.warn('Could not wrap sendChatMessage for debug', e); }
 
-  // start listening to latest 30 chats
+  // start listening to latest 50 chats — use docChanges() for real-time incremental updates (no lag)
   function startChatListener(){
     if(unsubscribeChats) return;
-    console.log('[DEBUG] startChatListener - setting up listener on chats collection');
-    const q = query(collection(db,'chats'), orderBy('timestamp','desc'), limit(30));
+    console.log('[DEBUG] startChatListener - setting up listener on chats collection with docChanges()');
+    const q = query(collection(db,'chats'), orderBy('timestamp','asc'), limit(50));
     try{
       unsubscribeChats = onSnapshot(q, snap => {
         console.log('[DEBUG] Firestore chat snapshot received, docs:', snap.size);
-      const msgs = [];
-      snap.forEach(d => { const data = d.data(); msgs.push({ id: d.id, from: data.from, email: data.email, text: data.text, ts: formatTs(data.timestamp), timestamp: data.timestamp, uid: data.uid, reported: data.reported||false }); });
-      // reverse to show oldest first
-      msgs.reverse();
-      // If snapshot returned empty, try server fallback before rendering an empty UI
-      if(Array.isArray(msgs) && msgs.length === 0){
-        // If we already have local messages, preserve them (avoid UI flash)
-        if(Array.isArray(window.chatMessages) && window.chatMessages.length > 0){
-          console.log('[DEBUG] Firestore snapshot empty — preserving existing chatMessages from local state');
-          try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
-          return;
-        }
-
-        // No local messages — attempt server fallback to populate chats
-        (async ()=>{
-          try{
-            console.log('[DEBUG] Firestore snapshot empty — attempting /api/messages fallback');
-            const resp = await fetch('/api/messages');
-            if(resp && resp.ok){
-              const j = await resp.json();
-              console.log('[DEBUG] /api/messages response:', j);
-              if(j && j.success && Array.isArray(j.messages) && j.messages.length > 0){
-                console.log('[DEBUG] Server fallback found', j.messages.length, 'messages');
-                window.chatMessages = j.messages;
-                try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
-                renderChatMessages();
-                return;
-              } else {
-                console.log('[DEBUG] Server fallback returned no messages');
-              }
-            } else {
-              console.warn('[DEBUG] /api/messages request failed, status:', resp ? resp.status : 'no response');
-            }
-          }catch(e){ console.debug('Failed to fetch /api/messages fallback after empty snapshot', e); }
-
-          // If fallback didn't produce messages, use empty snapshot (show no messages)
-          console.log('[DEBUG] Showing empty chat (no Firestore or server messages)');
-          window.chatMessages = msgs;
-          try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
-          renderChatMessages();
-        })();
-
-        return;
-      }
-
-      window.chatMessages = msgs;
-      // clear any status message
-      try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
-      renderChatMessages();
+        // Use docChanges() for real-time incremental updates — messages appear instantly without re-rendering entire list
+        window.chatMessages = window.chatMessages || [];
+        snap.docChanges().forEach((change) => {
+          const d = change.doc;
+          const data = d.data();
+          const msg = { id: d.id, from: data.from, email: data.email, text: data.text, ts: formatTs(data.timestamp), timestamp: data.timestamp, uid: data.uid, reported: data.reported || false };
+          
+          if (change.type === 'added') {
+            // New message: append to list
+            const exists = window.chatMessages.findIndex(m => m.id === msg.id) >= 0;
+            if (!exists) window.chatMessages.push(msg);
+            console.debug('[DEBUG] docChange: added message id:', d.id);
+          } else if (change.type === 'modified') {
+            // Modified message: update in-place
+            const idx = window.chatMessages.findIndex(m => m.id === msg.id);
+            if (idx >= 0) window.chatMessages[idx] = msg;
+            console.debug('[DEBUG] docChange: modified message id:', d.id);
+          } else if (change.type === 'removed') {
+            // Deleted message: remove from list
+            window.chatMessages = window.chatMessages.filter(m => m.id !== msg.id);
+            console.debug('[DEBUG] docChange: removed message id:', d.id);
+          }
+        });
+        // Keep only last 50 messages in memory to avoid huge arrays
+        if(window.chatMessages.length > 50) window.chatMessages = window.chatMessages.slice(-50);
+        // docChanges() pattern automatically updates messages in real-time
+        // No need to check for empty snapshot — listener adds/modifies/removes messages incrementally
+        // Render after each batch of changes
+        try{ const s = document.getElementById('chatStatus'); if(s) s.textContent = ''; }catch(e){}
+        renderChatMessages();
     }, err=> {
       console.error('[DEBUG] Firestore chat listener error:', err && err.code ? err.code : 'unknown', err && err.message ? err.message : '');
       try{
@@ -2949,10 +2933,11 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
   // report chat -> add to reports collection and mark chat
   window.reportChat = async function(msgId){
     const user = auth.currentUser; if(!user){ openAuth('login'); return; }
+    console.debug('[DEBUG] reportChat: looking for msgId:', msgId);
     try{
       const chatRef = doc(db,'chats', msgId);
       const chatSnap = await getDoc(chatRef);
-      if(!chatSnap.exists()){ alert('Message not found'); return; }
+      if(!chatSnap.exists()){ console.warn('[DEBUG] reportChat: doc not found for id:', msgId); alert('Message not found'); return; }
       const data = chatSnap.data();
       await addDoc(collection(db,'reports'), { msgId, chatText: data.text, from: data.from, email: data.email, uid: data.uid || null, reportedBy: user.email, reportedAt: serverTimestamp() });
       await setDoc(chatRef, { reported: true }, { merge: true });
