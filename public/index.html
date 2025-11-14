@@ -2079,11 +2079,33 @@ async function uploadFileToCloudinarySigned(file){
         return await doSignedUpload(sigData);
       }catch(signedErr){
         console.error('Signed retry after unsigned failure also failed', signedErr);
-        throw signedErr;
+        // Server-side fallback: read file as base64 and upload via /api/upload-cloudinary
+        try{
+          const reader = new FileReader();
+          const base64 = await new Promise((resolve, reject) => {
+            reader.onload = () => {
+              const result = reader.result;
+              const base64Str = typeof result === 'string' ? result.split(',')[1] : null;
+              if(!base64Str) reject(new Error('Failed to read file'));
+              else resolve(base64Str);
+            };
+            reader.onerror = () => reject(new Error('File read error'));
+            reader.readAsDataURL(file);
+          });
+          console.log('Attempting server-side upload fallback...');
+          const serverResp = await fetch('/api/upload-cloudinary', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ filename: file.name, data: base64 }) });
+          if(!serverResp.ok) throw new Error('Server upload returned ' + serverResp.status);
+          const serverJson = await serverResp.json();
+          if(fileNameEl) fileNameEl.textContent = 'No file chosen';
+          return serverJson;
+        }catch(fallbackErr){
+          console.error('Server-side fallback failed', fallbackErr);
+          throw new Error('All upload methods failed. ' + (signedErr && signedErr.message ? signedErr.message : 'Unknown error'));
+        }
       }
     }
   }
-
+  
   // No upload preset provided: perform a signed upload (normal flow)
   const sigResp = await fetch('/api/cloudinary-sign', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ filename: file.name }) });
   if(!sigResp.ok) throw new Error('Signature request failed');

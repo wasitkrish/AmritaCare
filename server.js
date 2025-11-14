@@ -190,6 +190,61 @@ app.post('/api/cloudinary-sign', (req, res) => {
   res.json({ signature, timestamp, api_key: apiKey, cloud_name: cloudName });
 });
 
+// Server-side upload endpoint: accepts JSON { filename, data } where data is base64-encoded file
+app.post('/api/upload-cloudinary', async (req, res) => {
+  try {
+    const { filename, data } = req.body || {};
+    if (!data || !filename) return res.status(400).json({ error: 'missing_params' });
+
+    const apiSecret = (process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET || '').trim();
+    const apiKey = (process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY || '').trim();
+    const cloudName = (process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || '').trim();
+    if (!apiSecret || !apiKey || !cloudName) return res.status(500).json({ error: 'Cloudinary not configured' });
+
+    // Decode base64
+    let fileBuffer;
+    try { fileBuffer = Buffer.from(data, 'base64'); } catch(e) { return res.status(400).json({ error: 'invalid_base64' }); }
+
+    // Build multipart/form-data
+    const boundary = '----ServerCloudinary' + Date.now();
+    const parts = [];
+    const addField = (name, val) => { parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${val}\r\n`)); };
+
+    const ts = Math.floor(Date.now() / 1000);
+    addField('api_key', apiKey);
+    addField('timestamp', String(ts));
+    const toSign = `timestamp=${ts}`;
+    const signature = crypto.createHash('sha1').update(toSign + apiSecret).digest('hex');
+    addField('signature', signature);
+    addField('transformation', 'w_1600,c_limit');
+
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`));
+    parts.push(fileBuffer);
+    parts.push(Buffer.from('\r\n'));
+    parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+    const body = Buffer.concat(parts);
+    const options = { hostname: 'api.cloudinary.com', port: 443, path: `/v1_1/${cloudName}/auto/upload`, method: 'POST', headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Content-Length': body.length } };
+
+    const https = require('https');
+    const httpsReq = https.request(options, (httpsRes) => {
+      let data = '';
+      httpsRes.setEncoding('utf8');
+      httpsRes.on('data', chunk => data += chunk);
+      httpsRes.on('end', () => {
+        try{ const json = JSON.parse(data); return res.json(json); } catch(e){ return res.status(500).json({ error: 'invalid_response', body: data }); }
+      });
+    });
+    httpsReq.on('error', (e) => { console.error('Server upload error', e); return res.status(500).json({ error: 'upload_failed' }); });
+    httpsReq.write(body);
+    httpsReq.end();
+
+  } catch (err) {
+    console.error('/api/upload-cloudinary error', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
 // --- OTP via Email (SendGrid with Gmail SMTP fallback) ---
 function base64url(str){ return Buffer.from(str).toString('base64').replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_'); }
 function base64urlDecode(b64){ return Buffer.from(b64.replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8'); }
