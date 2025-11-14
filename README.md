@@ -19,7 +19,6 @@ A modern web platform dedicated to raising awareness about student mental health
 - **Authentication:** Firebase
 - **File Upload:** Cloudinary
 - **Backend:** Node.js + Express
-- **AI Chat:** OpenAI GPT API
 - **Contact Form:** FormSubmit.io
 
 ## Getting Started
@@ -30,7 +29,6 @@ A modern web platform dedicated to raising awareness about student mental health
 - npm or yarn
 - Firebase project credentials
 - Cloudinary account
-- OpenAI API key
 
 ### Installation
 
@@ -53,7 +51,6 @@ A modern web platform dedicated to raising awareness about student mental health
    Update `.env` with your credentials:
    - Firebase configuration
    - Cloudinary credentials
-   - OpenAI API key
    - FormSubmit.io email
 
 4. Start the development server
@@ -107,7 +104,7 @@ This project is open source and available under the MIT License.
 
 ## Contact
 
-For questions or support, reach out via the contact form on the website or email: singhkrish.np@gmail.com
+For questions or support, reach out via the contact form on the website or email: singhkrish.main.acc@gmail.com
 
 ---
 
