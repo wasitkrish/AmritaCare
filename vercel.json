@@ -1,8 +1,12 @@
 {
   "version": 2,
   "buildCommand": "npm install",
+  "public": "public",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "src": "/public/videos/(.*)", "dest": "/public/videos/$1" },
+    { "src": "/videos/(.*)", "dest": "/public/videos/$1" },
+    { "src": "/(.*)", "methods": ["GET"], "dest": "/public/$1" },
     { "src": "^/(.*)$", "dest": "/index.html" }
   ]
 }
