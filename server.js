@@ -213,6 +213,7 @@ app.post('/api/upload-cloudinary', async (req, res) => {
     const ts = Math.floor(Date.now() / 1000);
     addField('api_key', apiKey);
     addField('timestamp', String(ts));
+    // Signature should only include timestamp, NOT transformation
     const toSign = `timestamp=${ts}`;
     const signature = crypto.createHash('sha1').update(toSign + apiSecret).digest('hex');
     addField('signature', signature);
