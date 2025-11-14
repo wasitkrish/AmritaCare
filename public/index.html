@@ -35,6 +35,10 @@
   body{background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;}
   .muted{ color:var(--muted); }
 
+  /* Footer link that matches theme accent colors */
+  footer .footer-link{ color:var(--accent-1); font-weight:600; text-decoration:none; transition:color .18s ease, text-shadow .18s ease; }
+  footer .footer-link:hover{ color:var(--accent-2); text-decoration:underline; text-shadow:0 2px 10px var(--glow-light); }
+
   /* --- Cards: subtle purple glow while preserving original shadows --- */
   .card{
     background:var(--card-bg);
@@ -984,7 +988,7 @@ textarea.form-input { resize: none; }
 </main>
 
 <footer class="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 py-6">
-  <div class="max-w-6xl mx-auto px-4 text-sm muted text-center">© 2025 AmritaCare · A compassion driven project</a></div>
+  <div class="max-w-6xl mx-auto px-4 text-sm muted text-center">© 2025 AmritaCare · A compassion driven project by <a href="https://linktr.ee/wasitkrish" class="footer-link">@wasitkrish</a></div>
 </footer>
 
 <!-- AUTH modal -->
