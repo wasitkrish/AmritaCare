@@ -1,5 +1,5 @@
 {
-  "name": "mental-health-students-site",
+  "name": "amrita-care",
   "version": "1.0.0",
   "description": "Mental health awareness platform for students with community chat, video gallery, and support features",
   "main": "server.js",
@@ -29,10 +29,10 @@
     "cloudinary",
     "community"
   ],
-  "author": "Your Name",
+  "author": "wasitkrish <singhkrish.main.acc@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/mental-health-students-site"
+    "url": "https://github.com/wasitkrish/AmritaCare.git"
   }
 }
