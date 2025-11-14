@@ -1934,15 +1934,25 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
   const file = document.getElementById('shareFile').files[0];
   let uploadedUrl = null;
 
+  let uploadFailed = false;
   if(file){
     // Upload to Cloudinary using server-signed request
     try{
       const uploadResult = await uploadFileToCloudinarySigned(file);
       uploadedUrl = uploadResult.secure_url || uploadResult.url || uploadResult.secureUrl || null;
+      if(!uploadedUrl){
+        throw new Error('No URL returned from Cloudinary');
+      }
     }catch(err){
       console.error('Cloudinary upload failed:', err);
-      alert('Upload failed. Sharing message without file.');
+      // Ask the user whether to proceed without the file. If user cancels, abort the share.
+      const proceed = confirm('File upload failed: ' + (err && err.message ? err.message : String(err)) + '\n\nDo you want to share the message without the file? Click OK to continue, Cancel to abort.');
+      if(!proceed){
+        if(fileNameEl) fileNameEl.textContent = 'No file chosen';
+        return; // abort sharing
+      }
       uploadedUrl = null;
+      uploadFailed = true;
     }
   }
 
@@ -1966,19 +1976,29 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
   try{
     if(window._useFirebaseAuth && window._firebase && window._firebase.db){
       const db = window._firebase.db;
-      try{ await addDoc(collection(db,'shares'), { ...shareObj, createdAt: serverTimestamp() }); }catch(e){ console.warn('Failed to write share to Firestore', e); }
-      // Also post as a chat message so it appears in realtime chat
+      try{ 
+        await addDoc(collection(db,'shares'), { ...shareObj, createdAt: serverTimestamp() }); 
+      }catch(e){ 
+        console.warn('Failed to write share to Firestore', e); 
+      }
+      // Also post as a chat message so it appears in realtime chat. If Firestore is not available or the write fails,
+      // fall back to the server-side /api/messages endpoint so other clients still receive the message.
+      const chatPayload = {
+        uid: window._firebase.auth && window._firebase.auth.currentUser ? window._firebase.auth.currentUser.uid : null,
+        from: user.name || user.email.split('@')[0],
+        email: user.email,
+        text: `${t}${uploadedUrl ? '\n' + uploadedUrl : ''}`,
+        timestamp: Date.now()
+      };
       try{
-        const chatPayload = {
-          uid: window._firebase.auth && window._firebase.auth.currentUser ? window._firebase.auth.currentUser.uid : null,
-          from: user.name || user.email.split('@')[0],
-          email: user.email,
-          text: `${t}${uploadedUrl ? '\n' + uploadedUrl : ''}`,
-          timestamp: serverTimestamp()
-        };
         console.debug('[DEBUG] Firestore write payload (share->chats):', chatPayload);
-        await addDoc(collection(db,'chats'), chatPayload);
-      }catch(e){ console.warn('Failed to post share into chats', e); }
+        await addDoc(collection(db,'chats'), { ...chatPayload, createdAt: serverTimestamp() });
+      }catch(e){
+        console.warn('Failed to post share into chats (Firestore). Falling back to server /api/messages', e);
+        try{
+          await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ from: chatPayload.from, email: chatPayload.email, text: chatPayload.text, timestamp: chatPayload.timestamp }) });
+        }catch(err){ console.warn('Server /api/messages fallback failed', err); }
+      }
     }
   }catch(e){ console.warn('share persistence error', e); }
 
