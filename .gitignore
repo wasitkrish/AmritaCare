@@ -9,7 +9,6 @@ build/
 *.log
 .vercel
 .env*.local
-public/videos/
 coverage/
 tmp/
 /.cache
