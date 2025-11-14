@@ -1,10 +1,8 @@
 {
   "version": 2,
+  "buildCommand": "npm install",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.js" },
     { "src": "^/(.*)$", "dest": "/index.html" }
   ]
-}
-{
-  "buildCommand": "npm install"
 }
