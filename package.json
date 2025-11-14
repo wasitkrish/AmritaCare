@@ -14,8 +14,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "firebase-admin": "^13.6.0",
-    "nodemailer": "^7.0.10",
-    "puppeteer": "^24.30.0"
+    "nodemailer": "^7.0.10"
   },
   "engines": {
     "node": ">=18.0.0"
