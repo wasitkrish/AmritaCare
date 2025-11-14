@@ -149,6 +149,76 @@ app.get('/api/messages', async (req, res) => {
 });
 
 /**
+ * Report endpoint - server-side (uses Admin SDK if available)
+ * POST /api/report - Save a report for a chat message
+ * Body: { chatId, userId, reason, reporterId } (reporterId is the authenticated user)
+ */
+app.post('/api/report', async (req, res) => {
+  try {
+    const { chatId, userId, reason, reporterId } = req.body || {};
+    
+    // Validate required fields
+    if (!chatId || !userId || !reason || !reporterId) {
+      return res.status(400).json({ error: 'missing_fields', detail: 'chatId, userId, reason, and reporterId are required' });
+    }
+    
+    // Validate reason length
+    if (String(reason).trim().length === 0) {
+      return res.status(400).json({ error: 'invalid_reason', detail: 'reason cannot be empty' });
+    }
+
+    // If Admin SDK is configured, write via Admin (server-side persistence)
+    if (_adminDb) {
+      try {
+        if (_adminIsRealtime) {
+          // Write report to RTDB
+          const reportRef = _adminDb.ref('reports').push();
+          const reportData = {
+            chatId,
+            userId,
+            reporterId,
+            reason: String(reason).trim(),
+            timestamp: admin.database.ServerValue.TIMESTAMP
+          };
+          await reportRef.set(reportData);
+          const reportId = reportRef.key;
+          
+          // Mark the chat as reported
+          await _adminDb.ref(`chats/${chatId}/reported`).set(true);
+          
+          console.log('✅ Report created via Admin SDK (RTDB):', reportId);
+          return res.json({ success: true, reportId, via: 'admin-rtdb' });
+        } else {
+          // Write report to Firestore
+          const docRef = await _adminDb.collection('reports').add({
+            chatId,
+            userId,
+            reporterId,
+            reason: String(reason).trim(),
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          });
+          
+          // Mark the chat as reported
+          await _adminDb.collection('chats').doc(chatId).update({ reported: true });
+          
+          console.log('✅ Report created via Admin SDK (Firestore):', docRef.id);
+          return res.json({ success: true, reportId: docRef.id, via: 'admin-firestore' });
+        }
+      } catch (adminErr) {
+        console.error('❌ Admin SDK report write error:', adminErr);
+        // Fall back to client-side write attempt
+      }
+    }
+
+    // Fallback: return error if no Admin SDK
+    return res.status(500).json({ error: 'server_error', detail: 'Admin SDK not initialized; reports must be written client-side or server must be configured with service account' });
+  } catch (err) {
+    console.error('❌ /api/report POST error:', err);
+    return res.status(500).json({ error: 'server_error', detail: err.message });
+  }
+});
+
+/**
  * Fallback - Serve index.html for all other routes (SPA)
  */
 
@@ -188,6 +258,79 @@ app.post('/api/cloudinary-sign', (req, res) => {
   const toSign = `timestamp=${timestamp}`;
   const signature = crypto.createHash('sha1').update(toSign + apiSecret).digest('hex');
   res.json({ signature, timestamp, api_key: apiKey, cloud_name: cloudName });
+});
+
+// Server-side upload endpoint: accepts JSON { filename, data } where data is base64-encoded file content
+app.post('/api/upload-json', async (req, res) => {
+  try {
+    const { filename, data, transformation } = req.body || {};
+    if (!data || !filename) return res.status(400).json({ error: 'missing_params' });
+
+    const apiSecret = (process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET || '').trim();
+    const apiKey = (process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY || '').trim();
+    const cloudName = (process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || '').trim();
+    if (!apiSecret || !apiKey || !cloudName) return res.status(500).json({ error: 'Cloudinary not configured on server' });
+
+    // Decode base64
+    let fileBuffer;
+    try{ fileBuffer = Buffer.from(data, 'base64'); }catch(e){ return res.status(400).json({ error: 'invalid_base64' }); }
+
+    // Build multipart/form-data body
+    const boundary = '----ServerCloudinary' + Date.now();
+    const parts = [];
+    function addField(name, val){ parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${val}\r\n`)); }
+
+    const ts = Math.floor(Date.now() / 1000);
+    // If caller provided a transformation string, include it; otherwise default
+    const tf = transformation && String(transformation).trim() ? String(transformation).trim() : 'w_1600,c_limit';
+
+    // Compute signature including timestamp and transformation to be safe
+    const paramsToSign = [];
+    paramsToSign.push(`timestamp=${ts}`);
+    if(tf) paramsToSign.push(`transformation=${tf}`);
+    paramsToSign.sort();
+    const toSign = paramsToSign.join('&');
+    const signature = crypto.createHash('sha1').update(toSign + apiSecret).digest('hex');
+
+    addField('api_key', apiKey);
+    addField('timestamp', String(ts));
+    addField('signature', signature);
+    if(tf) addField('transformation', tf);
+
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`));
+    parts.push(fileBuffer);
+    parts.push(Buffer.from('\r\n'));
+    parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+    const body = Buffer.concat(parts);
+
+    const options = {
+      hostname: 'api.cloudinary.com',
+      port: 443,
+      path: `/v1_1/${cloudName}/auto/upload`,
+      method: 'POST',
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length
+      }
+    };
+
+    const httpsReq = require('https').request(options, (httpsRes) => {
+      let data = '';
+      httpsRes.setEncoding('utf8');
+      httpsRes.on('data', chunk => data += chunk);
+      httpsRes.on('end', ()=>{
+        try{ const json = JSON.parse(data); return res.json(json); }catch(e){ return res.status(500).json({ error: 'invalid_cloudinary_response', body: data }); }
+      });
+    });
+    httpsReq.on('error', (e)=>{ console.error('Cloudinary upload error', e); return res.status(500).json({ error: 'upload_failed', detail: e.message }); });
+    httpsReq.write(body);
+    httpsReq.end();
+
+  } catch (err) {
+    console.error('/api/upload-json error', err);
+    return res.status(500).json({ error: 'server_error', detail: err.message });
+  }
 });
 
 // --- OTP via Email (SendGrid with Gmail SMTP fallback) ---
