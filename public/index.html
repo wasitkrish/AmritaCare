@@ -257,21 +257,43 @@
   }
 
   .stories-arrow{
-    position:absolute; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius:6px; display:flex; align-items:center; justify-content:center; z-index:30; cursor:pointer; color:var(--arrow);
-    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9)); border:1px solid rgba(2,6,23,0.06); transition:transform .12s ease;
+    display:none; /* Removed: arrows hidden in favor of auto-scroll + mouse/touch drag */
   }
-  .stories-arrow:hover{ transform:translateY(-50%) scale(1.06); box-shadow:0 8px 20px rgba(2,6,23,0.12); }
-  .dark .stories-arrow{ background:linear-gradient(180deg, rgba(12,17,26,0.72), rgba(17,24,39,0.72)); border:1px solid rgba(255,255,255,0.04); }
-  .stories-arrow.left{ left:10px } .stories-arrow.right{ right:10px }
 
-  @media (max-width:1024px){ 
-    .review-card{ width:calc((100% - (16px * 2))/3); }
+  /* Desktop: 5 cards per row */
+  @media (min-width:1400px){ 
+    .review-card{ width:calc((100% - (16px * 4))/5); padding:1.5rem; }
     .stories-track{ gap:16px; }
+    .review-card .font-semibold { font-size: 1rem; }
+    .review-card .text-xs { font-size: 0.75rem; }
+    .review-card .text-sm { font-size: 0.875rem; }
   }
-  @media (max-width:640px){ 
-    .review-card{ width:calc((100% - 16px)/1); }
+
+  /* Large tablet: 3 cards per row */
+  @media (min-width:768px) and (max-width:1399px){ 
+    .review-card{ width:calc((100% - (16px * 2))/3); padding:1.5rem; }
     .stories-track{ gap:16px; }
-    .review-card{ padding:1.25rem; }
+    .review-card .font-semibold { font-size: 0.95rem; }
+    .review-card .text-xs { font-size: 0.7rem; }
+    .review-card .text-sm { font-size: 0.85rem; }
+  }
+
+  /* Small tablet: 2 cards per row */
+  @media (min-width:480px) and (max-width:767px){ 
+    .review-card{ width:calc((100% - 16px)/2); padding:1.25rem; }
+    .stories-track{ gap:16px; }
+    .review-card .font-semibold { font-size: 0.9rem; }
+    .review-card .text-xs { font-size: 0.65rem; }
+    .review-card .text-sm { font-size: 0.8rem; }
+  }
+
+  /* Mobile: 1 card per row */
+  @media (max-width:479px){ 
+    .review-card{ width:100%; padding:1rem; }
+    .stories-track{ gap:12px; }
+    .review-card .font-semibold { font-size: 0.85rem; }
+    .review-card .text-xs { font-size: 0.6rem; }
+    .review-card .text-sm { font-size: 0.75rem; }
   }
 
   /* overlays */
@@ -649,12 +671,12 @@ textarea.form-input { resize: none; }
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
       <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold">MH</div>
-  <h1 class="text-lg font-bold text-indigo-700 dark:text-indigo-300">AmritaCare Demo</h1>
+  <h1 class="text-lg font-bold text-indigo-700 dark:text-indigo-300">AmritaCare</h1>
     </div>
 
     <div class="flex items-center gap-3">
       <div id="themeToggle" class="toggle-switch" role="button" tabindex="0"><div id="toggleBall" class="toggle-ball">🌙</div></div>
-      <button id="loginBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Login / Signup</button>
+      <button id="loginBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Login</button>
       <button id="profileBtn" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hidden">My Profile</button>
     </div>
   </div>
@@ -807,7 +829,7 @@ textarea.form-input { resize: none; }
       <!-- Share Your Experience -->
       <div class="card p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
         <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-300">Share Your Experience</h3>
-        <p class="text-sm muted mt-2">Write a short message — optionally upload a photo or short video.</p>
+        <p class="text-sm muted mt-2">Write a short message — upload a photo or short video.</p>
 
         <label class="block mt-4 text-sm">Message</label>
         <textarea id="shareMessage" rows="4" class="form-input mt-2" placeholder="Your message..."></textarea>
@@ -898,14 +920,11 @@ textarea.form-input { resize: none; }
     <div class="flex items-center justify-between mb-6">
       <div>
         <h3 class="text-xl font-semibold text-indigo-700 dark:text-indigo-300">Community Stories</h3>
-        <p class="text-sm muted mt-1">Read experiences shared by our community members</p>
+        <p class="text-sm muted mt-1">Read experiences shared by our students and community members.</p>
       </div>
     </div>
 
     <div class="relative">
-      <button id="storiesPrev" class="stories-arrow left" aria-label="Prev">‹</button>
-      <button id="storiesNext" class="stories-arrow right" aria-label="Next">›</button>
-
       <div class="stories-viewport">
         <div id="storiesTrack" class="stories-track">
           <div class="review-card">
@@ -965,7 +984,7 @@ textarea.form-input { resize: none; }
 </main>
 
 <footer class="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 py-6">
-  <div class="max-w-6xl mx-auto px-4 text-sm muted text-center">© 2025 AmritaCare · <a href="admin.html" class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">Admin</a></div>
+  <div class="max-w-6xl mx-auto px-4 text-sm muted text-center">© 2025 AmritaCare · A Compassion driven project</a></div>
 </footer>
 
 <!-- AUTH modal -->
@@ -1882,24 +1901,102 @@ window.addEventListener('load', ()=>{
   window.addEventListener('resize', ()=> { setPos(idx); updateContainerSize(); });
 })();
 
-/* STORIES carousel (fixed & navigatable) */
+/* STORIES carousel (fixed & navigatable with auto-scroll) */
 (function(){
   const track = document.getElementById('storiesTrack');
   const orig = Array.from(track.children);
   if(!orig.length) return;
   const base = orig.length;
   orig.forEach(n=> track.appendChild(n.cloneNode(true)));
-  let i = 0, moving=false;
+  let i = 0, moving=false, autoScrollInterval=null, isDragging=false, dragStart=0, dragOffset=0;
+  
   function cardW(){ const c = track.querySelector('.review-card'); const gap = parseFloat(getComputedStyle(track).gap)||12; return c.getBoundingClientRect().width + gap; }
-  function update(){ track.style.transform = `translateX(-${i * cardW()}px)`; }
-  function next(){ if(moving) return; moving=true; i++; track.style.transition='transform .42s cubic-bezier(.2,.9,.12,1)'; update(); track.addEventListener('transitionend', onEnd); }
-  function prev(){ if(moving) return; moving=true; i--; track.style.transition='transform .42s cubic-bezier(.2,.9,.12,1)'; update(); track.addEventListener('transitionend', onEnd); }
-  function onEnd(){ track.removeEventListener('transitionend', onEnd); if(i>=base){ track.style.transition='none'; i = i % base; update(); } if(i<0){ track.style.transition='none'; i = (base + (i % base)) % base; update(); } setTimeout(()=> moving=false,30); }
-  document.getElementById('storiesNext').addEventListener('click', next);
-  document.getElementById('storiesPrev').addEventListener('click', prev);
-  // swipe
-  (function(){ let sx=0; const view = document.querySelector('.stories-viewport'); view.addEventListener('touchstart', e=> sx = e.touches[0].clientX); view.addEventListener('touchend', e=> { const diff = e.changedTouches[0].clientX - sx; if(diff>40) prev(); if(diff<-40) next(); }); })();
-  window.addEventListener('resize', ()=> { track.style.transition='none'; update(); });
+  function update(){ track.style.transform = `translateX(-${(i * cardW()) + dragOffset}px)`; }
+  function next(){ if(moving) return; moving=true; i++; track.style.transition='transform .42s cubic-bezier(.2,.9,.12,1)'; dragOffset=0; update(); track.addEventListener('transitionend', onEnd); }
+  function prev(){ if(moving) return; moving=true; i--; track.style.transition='transform .42s cubic-bezier(.2,.9,.12,1)'; dragOffset=0; update(); track.addEventListener('transitionend', onEnd); }
+  function onEnd(){ track.removeEventListener('transitionend', onEnd); if(i>=base){ track.style.transition='none'; i = i % base; dragOffset=0; update(); } if(i<0){ track.style.transition='none'; i = (base + (i % base)) % base; dragOffset=0; update(); } setTimeout(()=> moving=false,30); resetAutoScroll(); }
+  
+  function startAutoScroll(){
+    if(autoScrollInterval) clearInterval(autoScrollInterval);
+    autoScrollInterval = setInterval(()=> next(), 5000);
+  }
+  function resetAutoScroll(){
+    if(autoScrollInterval) clearInterval(autoScrollInterval);
+    startAutoScroll();
+  }
+  
+  // Remove old button listeners if they exist
+  const oldNext = document.getElementById('storiesNext');
+  const oldPrev = document.getElementById('storiesPrev');
+  if(oldNext) oldNext.style.display = 'none';
+  if(oldPrev) oldPrev.style.display = 'none';
+  
+  // Mouse drag
+  const view = document.querySelector('.stories-viewport');
+  view.addEventListener('mousedown', e=> {
+    isDragging = true;
+    dragStart = e.clientX;
+    dragOffset = 0;
+    track.style.transition = 'none';
+    if(autoScrollInterval) clearInterval(autoScrollInterval);
+  });
+  view.addEventListener('mousemove', e=> {
+    if(!isDragging) return;
+    dragOffset = e.clientX - dragStart;
+    update();
+  });
+  view.addEventListener('mouseup', e=> {
+    if(!isDragging) return;
+    isDragging = false;
+    const diff = e.clientX - dragStart;
+    if(diff > 40) prev();
+    else if(diff < -40) next();
+    else {
+      dragOffset = 0;
+      track.style.transition = 'transform .3s ease';
+      update();
+      resetAutoScroll();
+    }
+  });
+  view.addEventListener('mouseleave', ()=> {
+    if(isDragging) {
+      isDragging = false;
+      dragOffset = 0;
+      track.style.transition = 'transform .3s ease';
+      update();
+      resetAutoScroll();
+    }
+  });
+  
+  // Touch swipe
+  (function(){ 
+    let sx=0, sy=0; 
+    view.addEventListener('touchstart', e=> { 
+      sx = e.touches[0].clientX; 
+      sy = e.touches[0].clientY;
+      track.style.transition = 'none';
+      if(autoScrollInterval) clearInterval(autoScrollInterval);
+    }); 
+    view.addEventListener('touchmove', e=> {
+      const dx = e.touches[0].clientX - sx;
+      dragOffset = dx;
+      update();
+    });
+    view.addEventListener('touchend', e=> { 
+      const diff = e.changedTouches[0].clientX - sx; 
+      if(diff>40) prev(); 
+      else if(diff<-40) next();
+      else {
+        dragOffset = 0;
+        track.style.transition = 'transform .3s ease';
+        update();
+        resetAutoScroll();
+      }
+    }); 
+  })();
+  
+  window.addEventListener('resize', ()=> { track.style.transition='none'; dragOffset=0; update(); });
+  startAutoScroll();
   update();
 })();
 
