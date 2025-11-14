@@ -2079,31 +2079,18 @@ async function uploadFileToCloudinarySigned(file){
         return await doSignedUpload(sigData);
       }catch(signedErr){
         console.error('Signed retry after unsigned failure also failed', signedErr);
-        // Attempt server-side upload as a final fallback (send base64 to /api/upload-json)
-        try{
-          const reader = new FileReader();
-          const base64 = await new Promise((resolve, reject) => {
-            reader.onload = () => resolve(String(reader.result).split(',')[1]);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          const uploadResp = await fetch('/api/upload-json', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ filename: file.name, data: base64, transformation: 'w_1600,c_limit' }) });
-          if(!uploadResp.ok) throw new Error('Server upload failed');
-          const uploadJson = await uploadResp.json();
-          return uploadJson;
-        }catch(finalErr){
-          console.error('Server-side fallback upload failed too', finalErr);
-          throw signedErr;
-        }
+        throw signedErr;
       }
     }
-    
-    // No upload preset provided: perform a signed upload (normal flow)
-    const sigResp = await fetch('/api/cloudinary-sign', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ filename: file.name }) });
-    if(!sigResp.ok) throw new Error('Signature request failed');
-    const sigData = await sigResp.json();
-    return await doSignedUpload(sigData);
   }
+
+  // No upload preset provided: perform a signed upload (normal flow)
+  const sigResp = await fetch('/api/cloudinary-sign', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ filename: file.name }) });
+  if(!sigResp.ok) throw new Error('Signature request failed');
+  const sigData = await sigResp.json();
+  return await doSignedUpload(sigData);
+}
+
 /* CONTACT FORM */
 document.getElementById('contactForm').addEventListener('submit', e=> { 
   e.preventDefault();
