@@ -1956,7 +1956,7 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
     }
   }
 
-  const fileInfo = uploadedUrl ? `\nUploaded: ${uploadedUrl}` : (file ? `\nFile: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB) - not uploaded` : '');
+  const fileInfo = uploadedUrl ? `\n✅ File uploaded successfully` : (file ? `\nFile: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB) - not uploaded` : '');
 
   // Store shared experiences (optional)
   const shares = JSON.parse(localStorage.getItem('mh_shared_experiences') || '[]');
