@@ -1,26 +1,114 @@
-# AmritaCare
+# Mental Health Awareness for Students
 
-This repository contains the AmritaCare web app (frontend in `public/` and server API in `api/`). It is prepared for deployment on Vercel.
+A modern web platform dedicated to raising awareness about student mental health, featuring inspirational videos and an interactive chat experience.
 
-Quick notes for production deployment
+## Features
 
-- Environment variables: set the secrets listed in `.env` as Vercel project environment variables (production). Do NOT commit `.env` to git.
-- For Firebase Admin persistence, set `FIREBASE_SERVICE_ACCOUNT_BASE64` to a base64-encoded service account JSON.
-- Keep server-only secrets under non-`VITE_` env names (e.g., `CLOUDINARY_API_SECRET`, `SENDGRID_API_KEY`).
-- Static assets are served from `public/`. Large media should be hosted on Cloudinary or a CDN instead of committing them to the repo. Consider removing `public/videos/` from git history and using Cloudinary.
-- Puppeteer has been removed from dependencies to reduce serverless bundle size; if you need headless Chromium, add documentation and a compatible build package.
+- 🎥 Video gallery with curated mental health content
+- 💬 AI-powered chat assistance (via OpenAI GPT)
+- 🔐 Firebase Authentication
+- ☁️ Cloudinary integration for file uploads
+- 📧 FormSubmit.io for contact form submissions
+- 🎨 Beautiful, responsive UI with Tailwind CSS
+- 🌙 Dark mode support
 
-How to deploy locally
+## Tech Stack
 
-1. Create a `.env` file with the required variables (see `.env.example` or your existing `.env`).
-2. Install dependencies: `npm install` (Node 18+ recommended).
-3. Run locally: `npm run dev` and open `http://localhost:3000`.
+- **Frontend:** HTML5, CSS3, JavaScript (Vanilla)
+- **Styling:** Tailwind CSS
+- **Authentication:** Firebase
+- **File Upload:** Cloudinary
+- **Backend:** Node.js + Express
+- **AI Chat:** OpenAI GPT API
+- **Contact Form:** FormSubmit.io
 
-Vercel notes
+## Getting Started
 
-- `vercel.json` routes `/api/*` to the serverless function exported by `api/index.js` and sends other routes to `index.html`.
-- Ensure the Vercel project has the environment variables configured and the project is pointed to this repository/branch. After pushing to `main`, Vercel will build and deploy automatically if connected.
+### Prerequisites
 
-If you'd like, I can remove large tracked files from history and force-push a clean main branch (I will only do this with your explicit approval).
-# AmritaCare
-AmritaCare is a student led initiative, a compassion driven project promoting mental health awareness among students.
+- Node.js (>= 16)
+- npm or yarn
+- Firebase project credentials
+- Cloudinary account
+- OpenAI API key
+
+### Installation
+
+1. Clone the repository
+   ```bash
+   git clone <repository-url>
+   cd mental-health-students-site
+   ```
+
+2. Install dependencies
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Update `.env` with your credentials:
+   - Firebase configuration
+   - Cloudinary credentials
+   - OpenAI API key
+   - FormSubmit.io email
+
+4. Start the development server
+   ```bash
+   npm start
+   ```
+
+5. Open your browser and navigate to `http://localhost:3000`
+
+## Project Structure
+
+```
+.
+├── public/
+│   ├── index.html         # Main HTML file
+│   ├── main.js           # Frontend logic
+│   ├── styles.css        # Custom styles
+│   └── videos/           # Video content (mp4 files)
+├── server.js             # Express server
+├── package.json          # Dependencies
+├── .env.example          # Environment variables template
+├── .gitignore            # Git ignore rules
+└── README.md             # This file
+```
+
+## Deployment
+
+### Vercel Deployment
+
+1. Push your repository to GitHub
+2. Connect your GitHub repo to Vercel at [vercel.com](https://vercel.com)
+3. Add your environment variables in Vercel settings
+4. Deploy!
+
+## API Endpoints
+
+- `POST /api/upload` - Upload video files (requires Cloudinary)
+- `POST /api/chat` - Send messages to AI chat (requires OpenAI API key)
+
+## Environment Variables
+
+See `.env.example` for all required environment variables.
+
+## Contributing
+
+Contributions are welcome! Feel free to submit a pull request.
+
+## License
+
+This project is open source and available under the MIT License.
+
+## Contact
+
+For questions or support, reach out via the contact form on the website or email: singhkrish.np@gmail.com
+
+---
+
+**Note:** This is a mental health awareness platform. If you or someone you know is struggling with mental health, please reach out to a professional or contact a mental health helpline.
