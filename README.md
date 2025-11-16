@@ -104,7 +104,7 @@ This project is open source and available under the MIT License.
 
 ## Contact
 
-For questions or support, reach out via the contact form on the website or email: singhkrish.main.acc@gmail.com
+For questions or support, reach out via the contact form on the website or email: contact@krishsingh.com.np
 
 ---
 
