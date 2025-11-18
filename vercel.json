@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install",
+  "buildCommand": "npm ci && npm run build",
   "public": true,
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.js" },
