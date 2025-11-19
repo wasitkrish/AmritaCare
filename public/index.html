@@ -1071,6 +1071,7 @@ textarea.form-input { resize: none; }
         <button id="sendOtpBtn" type="button" class="px-3 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold">Send OTP</button>
         <button id="showLogin" type="button" class="text-sm text-indigo-600">Back to login</button>
       </div>
+      <div id="signupError" class="text-xs text-red-600"></div>
     </form>
 
     <!-- OTP -->
@@ -1418,39 +1419,35 @@ sendOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
   const name = document.getElementById('signupName').value.trim();
   const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const pwd = document.getElementById('signupPassword').value;
-  
+  const errEl = document.getElementById('signupError');
+  if(errEl) errEl.textContent = '';
+
   if(!name || name.length < 2){
-    alert('❌ Please enter a valid name (at least 2 characters)');
+    if(errEl){ errEl.textContent = 'Please enter a valid name (min 2 chars)'; } else { alert('❌ Please enter a valid name (at least 2 characters)'); }
     return;
   }
-  
-  // Strict email validation - must end with @bl.students.amrita.edu
-  if(!email.endsWith('@bl.students.amrita.edu')){
-    alert('❌ Please use your institutional email ending with @bl.students.amrita.edu');
+  // Strict institutional email format
+  const emailPattern = /^[a-z0-9._%+-]+@bl\.students\.amrita\.edu$/i;
+  if(!emailPattern.test(email)){
+    if(errEl){ errEl.textContent = 'Invalid institutional email. Use @bl.students.amrita.edu'; } else { alert('❌ Please use your institutional email ending with @bl.students.amrita.edu'); }
     return;
   }
-  
   if(!pwd || pwd.length < 6){
-    alert('❌ Password must be at least 6 characters long');
+    if(errEl){ errEl.textContent = 'Password must be at least 6 characters'; } else { alert('❌ Password must be at least 6 characters long'); }
     return;
   }
-  
-  // Check if account already exists
   const accs = loadAccounts();
   if(accs.some(a=>a.email===email)){
-    alert('❌ Account already exists. Please login instead.');
+    if(errEl){ errEl.textContent = 'Account already exists. Please login.'; } else { alert('❌ Account already exists. Please login instead.'); }
     openAuth('login');
     return;
   }
-  
-  // Generate and store OTP
+  // Generate and store OTP only after passing validation
   const otp = generateOTP();
   storeOTP(email, otp);
   pendingSignup = { name, email, password: pwd };
   otpTarget.innerText = email;
   openAuth('otp');
-  
-  // Simulate OTP sending (in production, this would send via email)
   alert(`📨 OTP sent to ${email}\n\nSimulated OTP: ${otp}\n(In production, this would be sent via email)`);
 });
 
@@ -3479,6 +3476,14 @@ if(document.readyState === 'loading') {
             const email = document.getElementById('signupEmail').value.trim().toLowerCase();
             const pwd = document.getElementById('signupPassword').value;
             if(!name || !email || !pwd){ alert('Fill all fields'); return; }
+            // Institutional email validation (Firebase path)
+            const errEl = document.getElementById('signupError');
+            if(errEl) errEl.textContent='';
+            const emailPattern = /^[a-z0-9._%+-]+@bl\.students\.amrita\.edu$/i;
+            if(!emailPattern.test(email)){
+              if(errEl){ errEl.textContent = 'Invalid institutional email. Use @bl.students.amrita.edu'; } else { alert('Invalid institutional email'); }
+              return;
+            }
             try{
               const r = await fetch('/api/send-otp', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ name, email }) });
               const j = await r.json();
