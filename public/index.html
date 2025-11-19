@@ -113,6 +113,36 @@
     aspect-ratio: 16/9;
     max-width: 100%;
   }
+  .video-slide .yt-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+    cursor: pointer;
+    background: #000;
+  }
+  .video-slide .yt-play-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 68px;
+    height: 48px;
+    background: rgba(255, 0, 0, 0.9);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    pointer-events: none;
+  }
+  .video-slide:hover .yt-play-button {
+    background: rgba(255, 0, 0, 1);
+    transform: translate(-50%, -50%) scale(1.1);
+  }
 
   /* Centered overlay controls (only visible on hover / touch-active) */
   .video-overlay{
@@ -718,47 +748,61 @@ textarea.form-input { resize: none; }
 
       <div id="galleryTrack" class="gallery-track">
         <!-- 14 YouTube slides (lazy-loaded) -->
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/j1WcDEZuweU?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="j1WcDEZuweU">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/j1WcDEZuweU/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/U4xifNiIGZo?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="U4xifNiIGZo">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/U4xifNiIGZo/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/6KRwUijc9ss?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="6KRwUijc9ss">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/6KRwUijc9ss/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/SBrrZXik4GY?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="SBrrZXik4GY">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/SBrrZXik4GY/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/k1Ywgchdww8?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="k1Ywgchdww8">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/k1Ywgchdww8/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/NL_GJhF5HJo?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="NL_GJhF5HJo">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/NL_GJhF5HJo/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/oLJ9JxXsRrs?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="oLJ9JxXsRrs">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/oLJ9JxXsRrs/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/Gg7o-2OGvn0?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="Gg7o-2OGvn0">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/Gg7o-2OGvn0/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/zigJS7lXcus?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="zigJS7lXcus">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/zigJS7lXcus/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/52YWPgDIVrE?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="52YWPgDIVrE">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/52YWPgDIVrE/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/_kBEp5LdC3I?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="_kBEp5LdC3I">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/_kBEp5LdC3I/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/c_6PROln27Q?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="c_6PROln27Q">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/c_6PROln27Q/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/n-t-3eA4v9E?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="n-t-3eA4v9E">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/n-t-3eA4v9E/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
-        <div class="video-slide">
-          <iframe class="yt-embed" data-src="https://www.youtube.com/embed/KYnAlm3jZuk?rel=0&modestbranding=1&playsinline=1" frameborder="0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <div class="video-slide" data-video-id="KYnAlm3jZuk">
+          <img class="yt-thumbnail" src="https://img.youtube.com/vi/KYnAlm3jZuk/maxresdefault.jpg" alt="Video thumbnail" loading="lazy">
+          <div class="yt-play-button">▶</div>
         </div>
       </div>
 
@@ -1758,7 +1802,7 @@ window.addEventListener('load', ()=>{
       const iframe = child.querySelector('iframe.yt-embed');
       const v = child.querySelector('video');
       
-      // Handle YouTube iframes
+      // Handle YouTube iframes (if already loaded)
       if(iframe){
         try {
           if(i === currentIdx){
@@ -1860,6 +1904,37 @@ window.addEventListener('load', ()=>{
   document.getElementById('prevVideo').addEventListener('click', ()=> goTo(idx-1));
   dots.forEach(d=> d.addEventListener('click', e=> goTo(parseInt(d.dataset.index))));
 
+  // Handle YouTube thumbnail clicks - load iframe on demand
+  function bindYouTubeThumbnails(){
+    const slides = track.querySelectorAll('.video-slide[data-video-id]');
+    slides.forEach(slide => {
+      slide.addEventListener('click', (e) => {
+        const videoId = slide.dataset.videoId;
+        if(!videoId) return;
+        
+        // Check if iframe already exists
+        if(slide.querySelector('iframe')) return;
+        
+        // Create and insert iframe
+        const iframe = document.createElement('iframe');
+        iframe.className = 'yt-embed';
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+        iframe.frameBorder = '0';
+        iframe.allow = 'accelerometer; autoplay; encrypted-media; picture-in-picture';
+        iframe.allowFullscreen = true;
+        
+        // Remove thumbnail and play button
+        const thumbnail = slide.querySelector('.yt-thumbnail');
+        const playButton = slide.querySelector('.yt-play-button');
+        if(thumbnail) thumbnail.remove();
+        if(playButton) playButton.remove();
+        
+        // Add iframe
+        slide.appendChild(iframe);
+      });
+    });
+  }
+
   // overlays: play/pause, mute
   function bindOverlays(){
     const slidesAll = track.querySelectorAll('.video-slide');
@@ -1928,7 +2003,7 @@ window.addEventListener('load', ()=>{
 
   // init on load
   window.addEventListener('load', ()=> {
-    setTimeout(()=>{ setPos(0); bindOverlays(); bindEnded(); updateCounter(); playVisible(); updateContainerSize(); }, 120);
+    setTimeout(()=>{ setPos(0); bindOverlays(); bindEnded(); bindYouTubeThumbnails(); updateCounter(); playVisible(); updateContainerSize(); }, 120);
   });
   window.addEventListener('resize', ()=> { setPos(idx); updateContainerSize(); });
 })();
