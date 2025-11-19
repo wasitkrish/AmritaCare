@@ -1921,19 +1921,34 @@ window.addEventListener('load', ()=>{
   // Handle YouTube thumbnail clicks - load iframe on demand
   function bindYouTubeThumbnails(){
     const slides = track.querySelectorAll('.video-slide[data-video-id]');
-    slides.forEach(slide => {
+    console.log('Binding YouTube thumbnails to', slides.length, 'slides');
+    
+    slides.forEach((slide, slideIndex) => {
+      // Remove any existing listeners by cloning the node
+      const newSlide = slide.cloneNode(true);
+      slide.parentNode.replaceChild(newSlide, slide);
+      
       const clickHandler = (e) => {
+        console.log('Video slide clicked:', newSlide.dataset.videoId);
         e.preventDefault();
         e.stopPropagation();
         
-        const videoId = slide.dataset.videoId;
-        if(!videoId) return;
+        const videoId = newSlide.dataset.videoId;
+        if(!videoId) {
+          console.error('No video ID found');
+          return;
+        }
         
         // Check if iframe already exists
-        if(slide.querySelector('iframe')) return;
+        if(newSlide.querySelector('iframe')) {
+          console.log('Iframe already exists');
+          return;
+        }
+        
+        console.log('Creating iframe for video:', videoId);
         
         // Visual feedback
-        slide.style.opacity = '0.7';
+        newSlide.style.opacity = '0.7';
         
         // Create and insert iframe
         const iframe = document.createElement('iframe');
@@ -1943,28 +1958,30 @@ window.addEventListener('load', ()=>{
         iframe.allow = 'accelerometer; autoplay; encrypted-media; picture-in-picture';
         iframe.allowFullscreen = true;
         iframe.loading = 'eager';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
         
         // Remove thumbnail and play button
-        const thumbnail = slide.querySelector('.yt-thumbnail');
-        const playButton = slide.querySelector('.yt-play-button');
+        const thumbnail = newSlide.querySelector('.yt-thumbnail');
+        const playButton = newSlide.querySelector('.yt-play-button');
         if(thumbnail) thumbnail.remove();
         if(playButton) playButton.remove();
         
         // Add iframe
-        slide.appendChild(iframe);
+        newSlide.appendChild(iframe);
+        console.log('Iframe added, should start playing');
         
         // Reset opacity after a brief moment
         setTimeout(() => {
-          slide.style.opacity = '1';
+          newSlide.style.opacity = '1';
         }, 300);
       };
       
-      // Add click listeners to slide, thumbnail, and play button
-      slide.addEventListener('click', clickHandler);
-      const thumbnail = slide.querySelector('.yt-thumbnail');
-      const playButton = slide.querySelector('.yt-play-button');
-      if(thumbnail) thumbnail.addEventListener('click', clickHandler);
-      if(playButton) playButton.addEventListener('click', clickHandler);
+      // Add click listener directly to the slide (simplify to single listener)
+      newSlide.addEventListener('click', clickHandler, true);
+      newSlide.style.cursor = 'pointer';
+      
+      console.log('Click handler bound to slide', slideIndex);
     });
   }
 
