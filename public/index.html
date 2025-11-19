@@ -103,14 +103,13 @@
   .video-slide video,
   .video-slide iframe.yt-embed{ 
     width:100%; 
-    height:100%; 
-    object-fit:contain; 
     border-radius:12px; 
     display:block; 
     background:#000;
   }
   .video-slide iframe.yt-embed {
     aspect-ratio: 16/9;
+    height: auto;
     max-width: 100%;
   }
 
@@ -1728,42 +1727,40 @@ window.addEventListener('load', ()=>{
   const fade = document.getElementById('galleryFade');
   const viewport = document.getElementById('galleryViewport');
 
-  // Dynamic container sizing based on video dimensions
+  // Hide viewport until positioned to avoid showing last-clone first
+  if(viewport) viewport.style.visibility = 'hidden';
+
+  // Dynamic container sizing based on content
   function updateContainerSize(){
     const children = Array.from(track.children);
     const currentIdx = idx + 1;
     const currentSlide = children[currentIdx];
     if(!currentSlide) return;
     
-    const video = currentSlide.querySelector('video');
-    if(!video) return;
-    
-    video.onloadedmetadata = ()=> {
-      const videoWidth = video.videoWidth;
-      const videoHeight = video.videoHeight;
-      const viewportWidth = track.parentElement.getBoundingClientRect().width;
-      
-      // Calculate height to maintain aspect ratio
-      const aspectRatio = videoWidth / videoHeight;
-      const calculatedHeight = viewportWidth / aspectRatio;
-      
-      // Set viewport height
+    // Prefer a fixed 16:9 aspect for iframes
+    const iframe = currentSlide.querySelector('iframe.yt-embed');
+    const viewportWidth = track.parentElement.getBoundingClientRect().width;
+    if(iframe){
+      const calculatedHeight = Math.round((9/16) * viewportWidth);
       viewport.style.height = calculatedHeight + 'px';
       viewport.style.minHeight = calculatedHeight + 'px';
-    };
+      return;
+    }
     
-    // Also trigger if metadata already loaded
-    if(video.readyState >= 1){
-      const videoWidth = video.videoWidth;
-      const videoHeight = video.videoHeight;
-      if(videoWidth && videoHeight){
-        const viewportWidth = track.parentElement.getBoundingClientRect().width;
-        const aspectRatio = videoWidth / videoHeight;
-        const calculatedHeight = viewportWidth / aspectRatio;
-        
-        viewport.style.height = calculatedHeight + 'px';
-        viewport.style.minHeight = calculatedHeight + 'px';
-      }
+    // Fallback: if using <video>
+    const video = currentSlide.querySelector('video');
+    if(video){
+      const setByMeta = ()=>{
+        const vw = video.videoWidth, vh = video.videoHeight;
+        if(vw && vh){
+          const ar = vw / vh;
+          const h = Math.round(viewportWidth / ar);
+          viewport.style.height = h + 'px';
+          viewport.style.minHeight = h + 'px';
+        }
+      };
+      if(video.readyState >= 1){ setByMeta(); }
+      else { video.onloadedmetadata = setByMeta; }
     }
   }
 
@@ -1771,7 +1768,7 @@ window.addEventListener('load', ()=>{
   function setPos(i){ const w=slideWidth(); track.style.transition='none'; track.style.transform = `translateX(-${(i+1)*w}px)`; }
   function updateCounter(){ if(videoCounter) videoCounter.textContent = `${idx + 1} / ${N}`; }
 
-  // play visible — play current video with retry logic
+  // play visible — for iframe embeds, do nothing; for <video>, try to play
   function playVisible(){
     const children = Array.from(track.children);
     const currentIdx = idx + 1;
@@ -1780,24 +1777,8 @@ window.addEventListener('load', ()=>{
       const iframe = child.querySelector('iframe.yt-embed');
       const v = child.querySelector('video');
       
-      // Handle YouTube iframes (if already loaded)
-      if(iframe){
-        try {
-          if(i === currentIdx){
-            // Load iframe src if not already loaded
-            if(!iframe.src && iframe.dataset.src){
-              iframe.src = iframe.dataset.src;
-            }
-          } else {
-            // Unload inactive iframes to save memory
-            if(iframe.src){
-              iframe.src = '';
-            }
-          }
-        } catch(e) {
-          console.log('iframe control error:', e);
-        }
-      }
+      // Do not alter iframe src; YouTube handles playback on user click
+      if(iframe){ /* no-op */ }
       
       // Handle regular video elements (fallback)
       if(!v) return;
@@ -1868,10 +1849,9 @@ window.addEventListener('load', ()=>{
       
       setTimeout(()=>{ 
         anim=false;
-        // Multiple attempts to ensure play starts
-        playVisible();
-        setTimeout(() => { playVisible(); updateContainerSize(); }, 50);
-        setTimeout(() => { playVisible(); updateContainerSize(); }, 150);
+        // Update height after animation
+        updateContainerSize();
+        setTimeout(updateContainerSize, 80);
       }, 30);
     };
     track.addEventListener('transitionend', onEnd);
@@ -1950,7 +1930,14 @@ window.addEventListener('load', ()=>{
 
   // init on load
   window.addEventListener('load', ()=> {
-    setTimeout(()=>{ setPos(0); bindOverlays(); bindEnded(); updateCounter(); updateContainerSize(); }, 120);
+    setTimeout(()=>{ 
+      setPos(0); 
+      bindOverlays(); 
+      bindEnded(); 
+      updateCounter(); 
+      updateContainerSize(); 
+      if(viewport) viewport.style.visibility = 'visible';
+    }, 120);
   });
   window.addEventListener('resize', ()=> { setPos(idx); updateContainerSize(); });
 })();
