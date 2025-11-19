@@ -120,28 +120,41 @@
     border-radius: 12px;
     cursor: pointer;
     background: #000;
+    pointer-events: auto;
   }
   .video-slide .yt-play-button {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 68px;
-    height: 48px;
-    background: rgba(255, 0, 0, 0.9);
-    border-radius: 12px;
+    width: 80px;
+    height: 56px;
+    background: rgba(255, 0, 0, 0.95);
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 28px;
     color: white;
     cursor: pointer;
-    transition: all 0.3s ease;
-    pointer-events: none;
+    transition: all 0.2s ease;
+    pointer-events: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10;
   }
-  .video-slide:hover .yt-play-button {
+  .video-slide[data-video-id] {
+    cursor: pointer;
+  }
+  .video-slide[data-video-id]:hover .yt-thumbnail {
+    filter: brightness(0.85);
+  }
+  .video-slide[data-video-id]:hover .yt-play-button {
     background: rgba(255, 0, 0, 1);
-    transform: translate(-50%, -50%) scale(1.1);
+    transform: translate(-50%, -50%) scale(1.15);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+  .video-slide[data-video-id]:active .yt-play-button {
+    transform: translate(-50%, -50%) scale(1.05);
   }
 
   /* Centered overlay controls (only visible on hover / touch-active) */
@@ -1908,20 +1921,27 @@ window.addEventListener('load', ()=>{
   function bindYouTubeThumbnails(){
     const slides = track.querySelectorAll('.video-slide[data-video-id]');
     slides.forEach(slide => {
-      slide.addEventListener('click', (e) => {
+      const clickHandler = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
         const videoId = slide.dataset.videoId;
         if(!videoId) return;
         
         // Check if iframe already exists
         if(slide.querySelector('iframe')) return;
         
+        // Visual feedback
+        slide.style.opacity = '0.7';
+        
         // Create and insert iframe
         const iframe = document.createElement('iframe');
         iframe.className = 'yt-embed';
-        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1`;
         iframe.frameBorder = '0';
         iframe.allow = 'accelerometer; autoplay; encrypted-media; picture-in-picture';
         iframe.allowFullscreen = true;
+        iframe.loading = 'eager';
         
         // Remove thumbnail and play button
         const thumbnail = slide.querySelector('.yt-thumbnail');
@@ -1931,7 +1951,19 @@ window.addEventListener('load', ()=>{
         
         // Add iframe
         slide.appendChild(iframe);
-      });
+        
+        // Reset opacity after a brief moment
+        setTimeout(() => {
+          slide.style.opacity = '1';
+        }, 300);
+      };
+      
+      // Add click listeners to slide, thumbnail, and play button
+      slide.addEventListener('click', clickHandler);
+      const thumbnail = slide.querySelector('.yt-thumbnail');
+      const playButton = slide.querySelector('.yt-play-button');
+      if(thumbnail) thumbnail.addEventListener('click', clickHandler);
+      if(playButton) playButton.addEventListener('click', clickHandler);
     });
   }
 
