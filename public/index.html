@@ -100,13 +100,18 @@
     width: 100%;
     height: 100%;
   }
-  .video-slide video{ 
+  .video-slide video,
+  .video-slide iframe.yt-embed{ 
     width:100%; 
     height:100%; 
     object-fit:contain; 
     border-radius:12px; 
     display:block; 
     background:#000;
+  }
+  .video-slide iframe.yt-embed {
+    aspect-ratio: 16/9;
+    max-width: 100%;
   }
 
   /* Centered overlay controls (only visible on hover / touch-active) */
@@ -179,8 +184,18 @@
   @media (max-width:640px){ .side-arrow{ width:40px; height:40px; } }
 
   .indicators{ position:absolute; left:50%; transform:translateX(-50%); bottom:12px; display:flex; gap:8px; z-index:45; }
-  .dot{ width:10px; height:10px; border-radius:999px; background:var(--dot-inactive); transition:transform .14s ease, background .18s ease; cursor:pointer; border:1px solid rgba(0,0,0,0.06); }
-  .dot.active{ background:var(--dot-active); transform:scale(1.12); }
+  .video-counter{ 
+    padding: 6px 14px; 
+    border-radius: 999px; 
+    background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0.75)); 
+    backdrop-filter: blur(8px);
+    color: #fff; 
+    font-size: 13px; 
+    font-weight: 600; 
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
 
   /* stories */
   .stories-section{ 
@@ -768,20 +783,7 @@ textarea.form-input { resize: none; }
       <button id="nextVideo" class="side-arrow right" aria-label="Next">›</button>
 
       <div class="indicators">
-        <div id="dot0" class="dot" data-index="0" title="1"></div>
-        <div id="dot1" class="dot" data-index="1" title="2"></div>
-        <div id="dot2" class="dot" data-index="2" title="3"></div>
-        <div id="dot3" class="dot" data-index="3" title="4"></div>
-        <div id="dot4" class="dot" data-index="4" title="5"></div>
-        <div id="dot5" class="dot" data-index="5" title="6"></div>
-        <div id="dot6" class="dot" data-index="6" title="7"></div>
-        <div id="dot7" class="dot" data-index="7" title="8"></div>
-        <div id="dot8" class="dot" data-index="8" title="9"></div>
-        <div id="dot9" class="dot" data-index="9" title="10"></div>
-        <div id="dot10" class="dot" data-index="10" title="11"></div>
-        <div id="dot11" class="dot" data-index="11" title="12"></div>
-        <div id="dot12" class="dot" data-index="12" title="13"></div>
-        <div id="dot13" class="dot" data-index="13" title="14"></div>
+        <div id="videoCounter" class="video-counter">1 / 14</div>
       </div>
     </div>
 
@@ -917,19 +919,19 @@ textarea.form-input { resize: none; }
 
           <div id="imagesTrack" class="images-track">
             <div class="image-slide">
-              <img src="https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=600&fit=crop" alt="Featured Image 1" />
+              <img src="/assets/1.jpeg" alt="Featured Image 1" />
             </div>
             <div class="image-slide">
-              <img src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=800&h=600&fit=crop" alt="Featured Image 2" />
+              <img src="/assets/2.jpeg" alt="Featured Image 2" />
             </div>
             <div class="image-slide">
-              <img src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&h=600&fit=crop" alt="Featured Image 3" />
+              <img src="/assets/3.jpeg" alt="Featured Image 3" />
             </div>
             <div class="image-slide">
-              <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop" alt="Featured Image 4" />
+              <img src="/assets/4.jpeg" alt="Featured Image 4" />
             </div>
             <div class="image-slide">
-              <img src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&h=600&fit=crop" alt="Featured Image 5" />
+              <img src="/assets/5.jpeg" alt="Featured Image 5" />
             </div>
           </div>
 
@@ -1718,12 +1720,7 @@ window.addEventListener('load', ()=>{
   track.appendChild(firstClone);
 
   let idx = 0, anim=false;
-  const dots = [
-    document.getElementById('dot0'), document.getElementById('dot1'), document.getElementById('dot2'), document.getElementById('dot3'),
-    document.getElementById('dot4'), document.getElementById('dot5'), document.getElementById('dot6'), document.getElementById('dot7'),
-    document.getElementById('dot8'), document.getElementById('dot9'), document.getElementById('dot10'), document.getElementById('dot11'),
-    document.getElementById('dot12'), document.getElementById('dot13')
-  ];
+  const videoCounter = document.getElementById('videoCounter');
   const fade = document.getElementById('galleryFade');
   const viewport = document.getElementById('galleryViewport');
 
@@ -1768,7 +1765,7 @@ window.addEventListener('load', ()=>{
 
   function slideWidth(){ return track.parentElement.getBoundingClientRect().width; }
   function setPos(i){ const w=slideWidth(); track.style.transition='none'; track.style.transform = `translateX(-${(i+1)*w}px)`; }
-  function updateDots(){ dots.forEach((d,i)=>{ d.classList.toggle('active', i===idx); d.style.background = i===idx ? 'var(--dot-active)' : 'var(--dot-inactive)'; }); }
+  function updateCounter(){ if(videoCounter) videoCounter.textContent = `${idx + 1} / ${N}`; }
 
   // play visible — play current video with retry logic
   function playVisible(){
@@ -1776,16 +1773,36 @@ window.addEventListener('load', ()=>{
     const currentIdx = idx + 1;
     
     children.forEach((child, i) => {
+      const iframe = child.querySelector('iframe.yt-embed');
       const v = child.querySelector('video');
+      
+      // Handle YouTube iframes
+      if(iframe){
+        try {
+          if(i === currentIdx){
+            // Load iframe src if not already loaded
+            if(!iframe.src && iframe.dataset.src){
+              iframe.src = iframe.dataset.src;
+            }
+          } else {
+            // Unload inactive iframes to save memory
+            if(iframe.src){
+              iframe.src = '';
+            }
+          }
+        } catch(e) {
+          console.log('iframe control error:', e);
+        }
+      }
+      
+      // Handle regular video elements (fallback)
       if(!v) return;
       
       try {
         if(i === currentIdx){
-          // This is the current video - play it
           v.muted = true;
           v.currentTime = 0;
           
-          // Try to play with multiple fallback attempts
           const attemptPlay = () => {
             const playPromise = v.play();
             if(playPromise !== undefined){
@@ -1796,7 +1813,6 @@ window.addEventListener('load', ()=>{
                 })
                 .catch(err => {
                   console.log('Play failed, retrying...', err);
-                  // Retry if play failed
                   setTimeout(() => {
                     v.play().catch(e => console.log('Final play attempt failed'));
                   }, 100);
@@ -1806,7 +1822,6 @@ window.addEventListener('load', ()=>{
           
           attemptPlay();
         } else {
-          // Pause all other videos
           v.pause();
           v.currentTime = 0;
         }
@@ -1843,7 +1858,7 @@ window.addEventListener('load', ()=>{
         target = 0; 
       }
       idx = (target + N) % N;
-      updateDots();
+      updateCounter();
       updateContainerSize();
       fade.classList.remove('active');
       
@@ -1931,7 +1946,7 @@ window.addEventListener('load', ()=>{
 
   // init on load
   window.addEventListener('load', ()=> {
-    setTimeout(()=>{ setPos(0); bindOverlays(); bindEnded(); updateDots(); playVisible(); updateContainerSize(); }, 120);
+    setTimeout(()=>{ setPos(0); bindOverlays(); bindEnded(); updateCounter(); playVisible(); updateContainerSize(); }, 120);
   });
   window.addEventListener('resize', ()=> { setPos(idx); updateContainerSize(); });
 })();
