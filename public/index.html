@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>AmritaCare</title>
+<link rel="icon" href="/assets/logo.png" type="image/png">
 <!-- Use compiled Tailwind CSS instead of CDN for reliability on Vercel -->
 <link rel="stylesheet" href="styles.css">
 <style>
@@ -674,8 +675,10 @@ textarea.form-input { resize: none; }
 <header class="sticky top-0 z-50">
   <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold">MH</div>
-  <h1 class="text-lg font-bold text-indigo-700 dark:text-indigo-300">AmritaCare</h1>
+      <img src="/assets/logo.jpeg" alt="AmritaCare logo" class="h-10 w-10 rounded-xl object-contain bg-black"
+           onerror="this.classList.add('hidden'); const f=document.getElementById('brandFallback'); if(f) f.classList.remove('hidden');">
+      <div id="brandFallback" class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold hidden">MH</div>
+      <h1 class="text-lg font-bold text-indigo-700 dark:text-indigo-300">AmritaCare</h1>
     </div>
 
     <div class="flex items-center gap-3">
