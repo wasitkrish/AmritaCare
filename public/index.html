@@ -1857,10 +1857,9 @@ window.addEventListener('load', ()=>{
     track.addEventListener('transitionend', onEnd);
   }
 
-  // bind arrows/dots
+  // bind arrows
   document.getElementById('nextVideo').addEventListener('click', ()=> goTo(idx+1));
   document.getElementById('prevVideo').addEventListener('click', ()=> goTo(idx-1));
-  dots.forEach(d=> d.addEventListener('click', e=> goTo(parseInt(d.dataset.index))));
 
   // overlays: play/pause, mute
   function bindOverlays(){
