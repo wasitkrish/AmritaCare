@@ -595,11 +595,12 @@
   }
 
   /* Featured Images Slideshow */
-  .images-section{ position:relative; }
-  .images-viewport{ position:relative; overflow:hidden; border-radius:12px; height:400px; background: var(--card-bg); }
+  .images-section{ position:relative; min-height: 400px; }
+  .images-viewport{ position:relative; overflow:hidden; border-radius:12px; height:400px; background: #f3f4f6; }
+  .dark .images-viewport{ background: #1f2937; }
   .images-track{ display:flex; transition:transform .5s cubic-bezier(.2,.9,.12,1); will-change:transform; height:100%; }
-  .image-slide{ flex:0 0 100%; position:relative; height:100%; display: flex; align-items: center; justify-content: center; background: var(--bg); }
-  .image-slide img{ width:100%; height:100%; object-fit:contain; border-radius:12px; display:block; max-height: 100%; }
+  .image-slide{ flex:0 0 100%; flex-shrink: 0; position:relative; height:100%; display: flex; align-items: center; justify-content: center; background: transparent; }
+  .image-slide img{ width:100%; height:100%; object-fit:contain; border-radius:8px; display:block; max-height: 100%; max-width: 100%; }
   
   .images-arrow{
     position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:40;
@@ -2858,10 +2859,17 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
 /* FEATURED IMAGES SLIDESHOW */
 (function(){
   const track = document.getElementById('imagesTrack');
-  if(!track) return;
+  if(!track) {
+    console.error('Featured images track not found');
+    return;
+  }
   const slides = Array.from(track.children);
-  if(!slides.length) return;
+  if(!slides.length) {
+    console.error('No featured image slides found');
+    return;
+  }
   const N = slides.length;
+  console.log('Featured images initialized with', N, 'slides');
   
   // Clone first and last for infinite loop
   const firstClone = slides[0].cloneNode(true);
@@ -2880,7 +2888,7 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     document.getElementById('imgDot2'),
     document.getElementById('imgDot3'),
     document.getElementById('imgDot4')
-  ];
+  ].filter(d => d !== null);
   
   function slideWidth(){
     return track.parentElement.getBoundingClientRect().width;
@@ -2894,6 +2902,7 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
   
   function updateDots(){
     dots.forEach((d, i) => {
+      if(!d) return;
       d.classList.toggle('active', i === idx);
       d.style.background = i === idx ? 'var(--dot-active)' : 'var(--dot-inactive)';
     });
@@ -2949,11 +2958,14 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
   }
   
   // Bind arrows
-  document.getElementById('prevImage').addEventListener('click', prev);
-  document.getElementById('nextImage').addEventListener('click', next);
+  const prevBtn = document.getElementById('prevImage');
+  const nextBtn = document.getElementById('nextImage');
+  if(prevBtn) prevBtn.addEventListener('click', prev);
+  if(nextBtn) nextBtn.addEventListener('click', next);
   
   // Bind dots
   dots.forEach(d => {
+    if(!d) return;
     d.addEventListener('click', () => {
       goTo(parseInt(d.dataset.index));
       resetAutoPlay();
@@ -2981,14 +2993,42 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
     if(e.key === 'ArrowRight') next();
   });
   
-  // Initialize
-  window.addEventListener('load', () => {
-    setTimeout(() => {
-      setPos(0);
-      updateDots();
-      startAutoPlay();
-    }, 120);
+  // Add error handling for images
+  const allImages = track.querySelectorAll('img');
+  let imagesLoaded = 0;
+  allImages.forEach(img => {
+    if(img.complete) {
+      imagesLoaded++;
+    }
+    img.addEventListener('load', () => {
+      imagesLoaded++;
+      console.log('Featured image loaded:', img.src);
+    });
+    img.addEventListener('error', (e) => {
+      console.error('Failed to load featured image:', img.src);
+      // Add fallback background
+      img.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      img.style.display = 'none';
+    });
   });
+  
+  // Initialize
+  function init() {
+    console.log('Initializing featured images carousel');
+    setPos(0);
+    updateDots();
+    startAutoPlay();
+    console.log('Featured images carousel started with autoplay');
+  }
+  
+  window.addEventListener('load', () => {
+    setTimeout(init, 150);
+  });
+  
+  // Also try immediate initialization if DOM is already ready
+  if(document.readyState === 'complete') {
+    setTimeout(init, 150);
+  }
   
   window.addEventListener('resize', () => {
     setPos(idx);
@@ -2998,10 +3038,14 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
   const viewport = document.querySelector('.images-viewport');
   if(viewport){
     viewport.addEventListener('mouseenter', () => {
-      if(autoPlayInterval) clearInterval(autoPlayInterval);
+      if(autoPlayInterval) {
+        clearInterval(autoPlayInterval);
+        console.log('Featured images autoplay paused');
+      }
     });
     viewport.addEventListener('mouseleave', () => {
       startAutoPlay();
+      console.log('Featured images autoplay resumed');
     });
   }
 })();
