@@ -203,21 +203,27 @@
     padding-top: 24px;
     padding-bottom: 40px;
   }
-  .stories-viewport{ 
-    /* Ensure hovered cards can rise above without being clipped */
-    overflow-x: hidden;
-    overflow-y: visible;
+  .stories-viewport{
+    /* Manual horizontal scroll */
+    overflow-x: auto;
+    overflow-y: hidden;
     padding-top: 20px;
     padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
   }
-  .stories-track{ 
-    display:flex; 
-    gap:16px; 
-    transition:transform .42s cubic-bezier(.2,.9,.12,1); 
-    will-change:transform; 
-    align-items:stretch; 
+  .stories-viewport::-webkit-scrollbar{ height:6px; }
+  .stories-viewport::-webkit-scrollbar-track{ background:transparent; }
+  .stories-viewport::-webkit-scrollbar-thumb{ background:rgba(99,102,241,0.35); border-radius:4px; }
+  .dark .stories-viewport::-webkit-scrollbar-thumb{ background:rgba(139,92,246,0.4); }
+  .stories-track{
+    display:flex;
+    gap:16px;
+    align-items:stretch;
+    scroll-snap-type: inherit;
+    /* remove transform-based carousel behavior */
   }
-  .review-card{ 
+  .review-card{
     width:calc((100% - (16px * 4))/5); 
     aspect-ratio:1/1; 
     flex:0 0 auto; 
@@ -248,6 +254,7 @@
     position: relative;
     z-index: 1;
   }
+  .review-card{ scroll-snap-align:start; }
   .review-card:hover{ 
     transform: translateY(-16px) scale(1.05); 
     box-shadow: 
@@ -556,10 +563,10 @@
     position:relative;
     overflow:hidden;
     border-radius:12px;
-    background: #e5e7eb;
+    background: transparent;
     display:block;
   }
-  .dark .images-viewport{ background: #374151; }
+  .dark .images-viewport{ background: transparent; }
   .images-track{
     display:flex;
     transition:transform .5s cubic-bezier(.2,.9,.12,1);
@@ -577,10 +584,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f9fafb;
-    padding: 12px 20px;
+    background: transparent;
+    padding: 0;
   }
-  .dark .image-slide{ background: #1f2937; }
+  .dark .image-slide{ background: transparent; }
   .image-slide img{
     width: 100%;
     height: auto;
@@ -593,9 +600,8 @@
 
   /* Mobile tweaks: reduce padding so viewport closely wraps image */
   @media (max-width:640px){
-    .images-viewport{ padding:8px 0; }
-    .image-slide{ padding:8px 12px; }
-    .image-slide img{ width:100%; height:auto; object-fit:contain; }
+    .images-viewport{ padding:0; }
+    .image-slide{ padding:0; }
   }
   
   .images-arrow{
@@ -1953,104 +1959,8 @@ window.addEventListener('load', ()=>{
   window.addEventListener('resize', ()=> { setPos(idx); updateContainerSize(); });
 })();
 
-/* STORIES carousel (fixed & navigatable with auto-scroll) */
-(function(){
-  const track = document.getElementById('storiesTrack');
-  const orig = Array.from(track.children);
-  if(!orig.length) return;
-  const base = orig.length;
-  orig.forEach(n=> track.appendChild(n.cloneNode(true)));
-  let i = 0, moving=false, autoScrollInterval=null, isDragging=false, dragStart=0, dragOffset=0;
-  
-  function cardW(){ const c = track.querySelector('.review-card'); const gap = parseFloat(getComputedStyle(track).gap)||12; return c.getBoundingClientRect().width + gap; }
-  function update(){ track.style.transform = `translateX(-${(i * cardW()) + dragOffset}px)`; }
-  function next(){ if(moving) return; moving=true; i++; track.style.transition='transform .42s cubic-bezier(.2,.9,.12,1)'; dragOffset=0; update(); track.addEventListener('transitionend', onEnd); }
-  function prev(){ if(moving) return; moving=true; i--; track.style.transition='transform .42s cubic-bezier(.2,.9,.12,1)'; dragOffset=0; update(); track.addEventListener('transitionend', onEnd); }
-  function onEnd(){ track.removeEventListener('transitionend', onEnd); if(i>=base){ track.style.transition='none'; i = i % base; dragOffset=0; update(); } if(i<0){ track.style.transition='none'; i = (base + (i % base)) % base; dragOffset=0; update(); } setTimeout(()=> moving=false,30); resetAutoScroll(); }
-  
-  function startAutoScroll(){
-    if(autoScrollInterval) clearInterval(autoScrollInterval);
-    autoScrollInterval = setInterval(()=> next(), 5000);
-  }
-  function resetAutoScroll(){
-    if(autoScrollInterval) clearInterval(autoScrollInterval);
-    startAutoScroll();
-  }
-  
-  // Remove old button listeners if they exist
-  const oldNext = document.getElementById('storiesNext');
-  const oldPrev = document.getElementById('storiesPrev');
-  if(oldNext) oldNext.style.display = 'none';
-  if(oldPrev) oldPrev.style.display = 'none';
-  
-  // Mouse drag
-  const view = document.querySelector('.stories-viewport');
-  view.addEventListener('mousedown', e=> {
-    isDragging = true;
-    dragStart = e.clientX;
-    dragOffset = 0;
-    track.style.transition = 'none';
-    if(autoScrollInterval) clearInterval(autoScrollInterval);
-  });
-  view.addEventListener('mousemove', e=> {
-    if(!isDragging) return;
-    dragOffset = e.clientX - dragStart;
-    update();
-  });
-  view.addEventListener('mouseup', e=> {
-    if(!isDragging) return;
-    isDragging = false;
-    const diff = e.clientX - dragStart;
-    if(diff > 40) prev();
-    else if(diff < -40) next();
-    else {
-      dragOffset = 0;
-      track.style.transition = 'transform .3s ease';
-      update();
-      resetAutoScroll();
-    }
-  });
-  view.addEventListener('mouseleave', ()=> {
-    if(isDragging) {
-      isDragging = false;
-      dragOffset = 0;
-      track.style.transition = 'transform .3s ease';
-      update();
-      resetAutoScroll();
-    }
-  });
-  
-  // Touch swipe
-  (function(){ 
-    let sx=0, sy=0; 
-    view.addEventListener('touchstart', e=> { 
-      sx = e.touches[0].clientX; 
-      sy = e.touches[0].clientY;
-      track.style.transition = 'none';
-      if(autoScrollInterval) clearInterval(autoScrollInterval);
-    }); 
-    view.addEventListener('touchmove', e=> {
-      const dx = e.touches[0].clientX - sx;
-      dragOffset = dx;
-      update();
-    });
-    view.addEventListener('touchend', e=> { 
-      const diff = e.changedTouches[0].clientX - sx; 
-      if(diff>40) prev(); 
-      else if(diff<-40) next();
-      else {
-        dragOffset = 0;
-        track.style.transition = 'transform .3s ease';
-        update();
-        resetAutoScroll();
-      }
-    }); 
-  })();
-  
-  window.addEventListener('resize', ()=> { track.style.transition='none'; dragOffset=0; update(); });
-  startAutoScroll();
-  update();
-})();
+/* STORIES: simple scroll (auto-scroll removed) */
+// No JS carousel; native horizontal scroll + scroll-snap now handles interaction.
 
 /* SHARE / CONTACT / CHAT */
 /* keep file name display responsive and add small animation on change */
