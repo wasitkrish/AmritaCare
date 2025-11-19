@@ -2771,16 +2771,16 @@ function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<',
 window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.classList.contains('hidden')) closeAuth(); if(!profileOverlay.classList.contains('hidden')) profileOverlay.classList.add('hidden'); } });
 
 /* FEATURED IMAGES SLIDESHOW */
-(function(){
+function initFeaturedImages() {
   const track = document.getElementById('imagesTrack');
   if(!track) {
     console.error('Featured images track not found');
-    return;
+    return false;
   }
   const slides = Array.from(track.children);
   if(!slides.length) {
     console.error('No featured image slides found');
-    return;
+    return false;
   }
   const N = slides.length;
   console.log('Featured images initialized with', N, 'slides');
@@ -2993,7 +2993,15 @@ window.addEventListener('keydown', e=> { if(e.key==='Escape'){ if(!authOverlay.c
       console.log('Featured images autoplay resumed');
     });
   }
-})();
+  return true;
+}
+
+// Call initialization when DOM is ready
+if(document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initFeaturedImages);
+} else {
+  initFeaturedImages();
+}
 
 </script>
 
