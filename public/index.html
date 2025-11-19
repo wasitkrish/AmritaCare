@@ -3352,6 +3352,12 @@ if(document.readyState === 'loading') {
   onAuthStateChanged(auth, async (user) => {
     console.log('[DEBUG] onAuthStateChanged - user:', user);
     if(user){
+      // Skip verification checks if signup is in progress (prevents race condition)
+      if(window._signupInProgress){
+        console.log('[DEBUG] Signup in progress, skipping verification check');
+        return;
+      }
+      
       // check banned (wrap in try/catch so a read error doesn't forcibly sign the user out)
       try{
         const bannedSnap = await get(ref(db, `banned/${user.uid}`));
@@ -3367,8 +3373,8 @@ if(document.readyState === 'loading') {
           const ud = await get(ref(db, `users/${user.uid}`));
           const ok = ud && ud.exists() && ud.val() && ud.val().otpVerified;
           if(!ok){
-            // If the users node says not otpVerified, force sign out
-            alert('Please verify your email address before using the site. A verification link was sent to your email.');
+            // If the users node says not otpVerified, silently sign out (avoid alert during signup flow)
+            console.warn('User not email-verified and not OTP-verified; signing out');
             await signOut(auth);
             return;
           } else {
@@ -3378,7 +3384,6 @@ if(document.readyState === 'loading') {
         }catch(e){
           // Don't sign the user out if reading the users node fails (e.g., security rules); log and proceed
           console.warn('Failed to check OTP verification status — proceeding without blocking sign-in:', e);
-          // Optionally notify in-console only; avoid alert to reduce UX friction
         }
       }
       // check if admin - redirect to admin dashboard if true
@@ -3467,6 +3472,7 @@ if(document.readyState === 'loading') {
         const sendOtpBtnEl = document.getElementById('sendOtpBtn');
         const verifyOtpBtnEl = document.getElementById('verifyOtpBtn');
         let pending = null;
+        let signupInProgress = false; // prevent auth listener interference during signup
 
         if(sendOtpBtnEl){
           sendOtpBtnEl.addEventListener('click', async (e)=>{
@@ -3506,24 +3512,27 @@ if(document.readyState === 'loading') {
                 if(!db){ console.error('Firebase db not initialized'); alert('Firebase database not available. Please refresh and try again.'); return; }
                 console.log('Creating user with:', pending.email);
                 try{
+                  window._signupInProgress = true; // Block auth listener during signup
                   const cred = await createUserWithEmailAndPassword(auth, pending.email, pending.password);
                   console.log('User created:', cred.user.uid);
-                  await updateProfile(cred.user, { displayName: pending.name });
-                  console.log('Profile updated');
-                  // Mark the RTDB users node as OTP-verified so onAuthStateChanged allows login
+                  // CRITICAL: Set otpVerified IMMEDIATELY before any other operations
                   await set(ref(db, `users/${cred.user.uid}`), { name: pending.name, email: pending.email, otpVerified: true, createdAt: Date.now() });
                   console.log('RTDB user node created (otpVerified:true)');
+                  await updateProfile(cred.user, { displayName: pending.name });
+                  console.log('Profile updated');
+                  window._signupInProgress = false; // Release flag
                   // Immediately update UI before closing auth modal
                   setCurrentUser({ uid: cred.user.uid, email: cred.user.email, name: pending.name });
                   try{ startChatListener(); }catch(e){ console.error('startChatListener after signup failed', e); }
                   closeAuth();
                   pending = null;
                   document.getElementById('otpInput').value = '';
-                  alert('Account created and verified! You can now log in.');
+                  alert('✅ Account created successfully! Welcome to AmritaCare.');
                 }catch(createErr){
                   // If account already exists, try to log in instead
                   if(createErr.code === 'auth/email-already-in-use'){
                     console.log('Account already exists, attempting to sign in...');
+                    window._signupInProgress = false; // Release flag before sign in
                     try{
                       const signed = await signInWithEmailAndPassword(auth, pending.email, pending.password);
                       console.log('Signed in successfully');
@@ -3536,17 +3545,18 @@ if(document.readyState === 'loading') {
                       closeAuth();
                       pending = null;
                       document.getElementById('otpInput').value = '';
-                      alert('Account exists. You have been logged in!');
+                      alert('✅ Welcome back! You have been logged in.');
                     }catch(signInErr){
                       console.error('Sign in failed:', signInErr);
                       alert('Account exists but sign in failed. Please use the login form. Error: '+signInErr.message);
                     }
                   } else {
+                    window._signupInProgress = false; // Release flag on error
                     console.error('Account creation failed:', createErr);
                     alert('Failed to create account: '+createErr.message);
                   }
                 }
-              }catch(err){ console.error('createUser after OTP failed:', err); alert('Failed to create account: '+err.message); }
+              }catch(err){ window._signupInProgress = false; console.error('createUser after OTP failed:', err); alert('Failed to create account: '+err.message); }
             }catch(err){ console.error('verify-otp error', err); alert('OTP verify failed: '+err.message); }
           });
         }
