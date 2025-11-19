@@ -150,59 +150,62 @@
   /* buttons: purple accent, rounded, hover animation */
   .ctrl-btn{
     width:48px;
-      /* Featured Images Slideshow */
-      .images-section{ position:relative; min-height: 300px; }
-      .images-viewport{ 
-        position:relative; 
-        overflow:hidden; 
-        border-radius:12px; 
-        background: #e5e7eb;
-        width: 100%;
-        min-height: 400px;
-        max-height: 600px;
-        height: auto;
-      }
-      .dark .images-viewport{ background: #374151; }
-      .images-track{ display:flex; transition:transform .5s cubic-bezier(.2,.9,.12,1); will-change:transform; height:100%; width: 100%; }
-      .image-slide{ 
-        flex:0 0 100%; 
-        flex-shrink: 0; 
-        position:relative; 
-        height:100%; 
-        width: 100%;
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        background: #f9fafb;
-        padding: 0;
-      }
-      .dark .image-slide{ background: #1f2937; }
-      .image-slide img{ 
-        width: 100%;
-        height: 100%;
-        object-fit: cover; 
-        border-radius:12px; 
-        display:block;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      }
-  
-      @media (max-width: 768px) {
-        .images-section{ min-height: 250px; }
-        .images-viewport{ 
-          min-height: 300px;
-          max-height: 450px;
-        }
-        .images-arrow{ width: 36px; height: 36px; font-size: 18px; }
-        .images-arrow.left{ left: 8px; }
-        .images-arrow.right{ right: 8px; }
-      }
-  
-      @media (max-width: 480px) {
-        .images-viewport{ 
-          min-height: 250px;
-          max-height: 350px;
-        }
-      }
+    height:48px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:9999px;
+    background: linear-gradient(90deg,var(--accent-1),var(--accent-2));
+    color:#fff;
+    cursor:pointer;
+    border: none;
+    font-size:18px;
+    transition: transform .14s ease, box-shadow .14s ease, opacity .14s ease;
+    box-shadow: 0 6px 18px rgba(99,102,241,0.14);
+    will-change:transform;
+  }
+  .ctrl-btn:hover{ transform: scale(1.06); box-shadow: 0 10px 28px rgba(99,102,241,0.18); }
+  .ctrl-btn:active{ transform: scale(.98); }
+
+  /* fallback style for old browsers (keeps look consistent) */
+  .ctrl-btn.fallback { background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.08); color:#fff; }
+
+  .gallery-fade{ position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .18s ease; z-index:30; background:linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.06)); }
+  .gallery-fade.active{ opacity:1; }
+
+  .side-arrow{
+    position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:40;
+    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9)); border:1px solid rgba(2,6,23,0.06); color:var(--arrow); transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .side-arrow:hover{ transform:translateY(-50%) scale(1.06); box-shadow:0 8px 20px rgba(2,6,23,0.12); }
+  .dark .side-arrow{ background:linear-gradient(180deg, rgba(12,17,26,0.72), rgba(17,24,39,0.72)); border:1px solid rgba(255,255,255,0.04); color:var(--arrow); }
+  .side-arrow.left{ left:12px; } .side-arrow.right{ right:12px; }
+  @media (max-width:640px){ .side-arrow{ width:40px; height:40px; } }
+
+  .indicators{ position:absolute; left:50%; transform:translateX(-50%); bottom:12px; display:flex; gap:8px; z-index:45; }
+  .video-counter{ 
+    padding: 6px 14px; 
+    border-radius: 999px; 
+    background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0.75)); 
+    backdrop-filter: blur(8px);
+    color: #fff; 
+    font-size: 13px; 
+    font-weight: 600; 
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+
+  /* stories */
+  .stories-section{ 
+    position:relative; 
+    overflow:hidden; 
+    padding-top: 24px;
+    padding-bottom: 40px;
+  }
+  .stories-viewport{ 
+    /* Ensure hovered cards can rise above without being clipped */
+    overflow-x: hidden;
     overflow-y: visible;
     padding-top: 20px;
     padding-bottom: 8px;
@@ -245,27 +248,24 @@
     position: relative;
     z-index: 1;
   }
-  .review-card{ 
-    width:calc((100% - (16px * 4))/5); 
-    min-height: 200px;
-    flex:0 0 auto; 
-    border-radius:14px; 
-    padding:1.75rem; 
-    background:var(--card-bg);
-    border: 1px solid rgba(2,6,23,0.06);
-    box-shadow:
-      0 4px 6px -1px rgba(0,0,0,0.05),
-      0 2px 4px -1px rgba(0,0,0,0.03);
-    color:var(--text); 
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    will-change: transform, box-shadow;
-    position: relative;
-    overflow: hidden;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+  .review-card:hover{ 
+    transform: translateY(-16px) scale(1.05); 
+    box-shadow: 
+      0 25px 50px -12px rgba(0,0,0,0.15),
+      0 0 0 1px rgba(99,102,241,0.2),
+      0 0 50px var(--glow-light);
+    z-index:60;
+    border-color: rgba(99,102,241,0.3);
   }
+  .review-card:hover::before{
+    opacity: 0.08;
+  }
+  .dark .review-card{ 
+    background:var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow:
+      0 4px 6px -1px rgba(0,0,0,0.3),
+      0 2px 4px -1px rgba(0,0,0,0.2);
   }
   .dark .review-card:hover{
     box-shadow: 
@@ -281,38 +281,38 @@
 
   /* Desktop: 5 cards per row */
   @media (min-width:1400px){ 
-    .review-card{ width:calc((100% - (16px * 4))/5); padding:1.75rem; min-height: 220px; }
+    .review-card{ width:calc((100% - (16px * 4))/5); padding:1.5rem; }
     .stories-track{ gap:16px; }
-    .review-card .font-semibold { font-size: 1.05rem; }
+    .review-card .font-semibold { font-size: 1rem; }
     .review-card .text-xs { font-size: 0.75rem; }
-    .review-card .text-sm { font-size: 0.9rem; line-height: 1.6; }
+    .review-card .text-sm { font-size: 0.875rem; }
   }
 
   /* Large tablet: 3 cards per row */
   @media (min-width:768px) and (max-width:1399px){ 
-    .review-card{ width:calc((100% - (16px * 2))/3); padding:1.5rem; min-height: 200px; }
+    .review-card{ width:calc((100% - (16px * 2))/3); padding:1.5rem; }
     .stories-track{ gap:16px; }
-    .review-card .font-semibold { font-size: 1rem; }
+    .review-card .font-semibold { font-size: 0.95rem; }
     .review-card .text-xs { font-size: 0.7rem; }
-    .review-card .text-sm { font-size: 0.875rem; line-height: 1.55; }
+    .review-card .text-sm { font-size: 0.85rem; }
   }
 
   /* Small tablet: 2 cards per row */
   @media (min-width:480px) and (max-width:767px){ 
-    .review-card{ width:calc((100% - 16px)/2); padding:1.25rem; min-height: 180px; }
+    .review-card{ width:calc((100% - 16px)/2); padding:1.25rem; }
     .stories-track{ gap:16px; }
-    .review-card .font-semibold { font-size: 0.95rem; }
+    .review-card .font-semibold { font-size: 0.9rem; }
     .review-card .text-xs { font-size: 0.65rem; }
-    .review-card .text-sm { font-size: 0.825rem; line-height: 1.5; }
+    .review-card .text-sm { font-size: 0.8rem; }
   }
 
   /* Mobile: 1 card per row */
   @media (max-width:479px){ 
-    .review-card{ width:100%; padding:1.25rem; min-height: 160px; }
+    .review-card{ width:100%; padding:1rem; }
     .stories-track{ gap:12px; }
-    .review-card .font-semibold { font-size: 0.9rem; }
-    .review-card .text-xs { font-size: 0.65rem; }
-    .review-card .text-sm { font-size: 0.8rem; line-height: 1.5; }
+    .review-card .font-semibold { font-size: 0.85rem; }
+    .review-card .text-xs { font-size: 0.6rem; }
+    .review-card .text-sm { font-size: 0.75rem; }
   }
 
   /* overlays */
@@ -1692,6 +1692,64 @@ changePasswordBtn.addEventListener('click', ()=>{
   }
 });
 
+/* restore session on load */
+window.addEventListener('load', ()=>{ 
+  const cur = getEffectiveUser(); 
+  if(cur){ 
+    document.getElementById('loginBtn').classList.add('hidden'); 
+    profileBtn.classList.remove('hidden'); 
+    document.getElementById('profileEmail').innerText = cur.email; 
+    profileName.value = cur.name || ''; 
+  }
+  // Start Firestore listener (Firestore-only chat)
+  try{ if(typeof startChatListener === 'function') startChatListener(); }catch(e){ console.debug('startChatListener not available at load', e); }
+  
+  // Add email validation on input
+  const signupEmailInput = document.getElementById('signupEmail');
+  const loginEmailInput = document.getElementById('loginEmail');
+  
+  if(signupEmailInput){
+    signupEmailInput.addEventListener('blur', function(){
+      const email = this.value.trim().toLowerCase();
+      if(email && !validateInstitutionalEmail(email)){
+        this.style.borderColor = '#ef4444';
+        this.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+      } else {
+        this.style.borderColor = '';
+        this.style.boxShadow = '';
+      }
+    });
+  }
+  
+  if(loginEmailInput){
+    loginEmailInput.addEventListener('blur', function(){
+      const email = this.value.trim().toLowerCase();
+      if(email && !validateInstitutionalEmail(email)){
+        this.style.borderColor = '#ef4444';
+        this.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+      } else {
+        this.style.borderColor = '';
+        this.style.boxShadow = '';
+      }
+    });
+  }
+  // Ensure gated UI reflects session state
+  try{ updateAuthGates(); }catch(e){}
+});
+
+/* VIDEO GALLERY - pixel-based loop + autoplay + overlay controls + indicators */
+(function(){
+  const track = document.getElementById('galleryTrack');
+  const slidesOrig = Array.from(track.children);
+  if(!slidesOrig.length) return;
+  const N = slidesOrig.length;
+  // clone
+  const firstClone = slidesOrig[0].cloneNode(true);
+  const lastClone = slidesOrig[N-1].cloneNode(true);
+  firstClone.classList.add('clone'); lastClone.classList.add('clone');
+  track.insertBefore(lastClone, track.firstChild);
+  track.appendChild(firstClone);
+
   let idx = 0, anim=false;
   const videoCounter = document.getElementById('videoCounter');
   const fade = document.getElementById('galleryFade');
@@ -2026,13 +2084,6 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
     return;
   }
   
-  // Show loading state
-  const sendBtn = document.getElementById('shareSend');
-  const originalText = sendBtn.innerHTML;
-  sendBtn.innerHTML = '<span class="loading-spinner"></span>';
-  sendBtn.classList.add('btn-loading');
-  sendBtn.disabled = true;
-  
   const file = document.getElementById('shareFile').files[0];
   let uploadedUrl = null;
 
@@ -2047,20 +2098,12 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
       }
     }catch(err){
       console.error('Cloudinary upload failed:', err);
-      // Reset button state before showing prompt
-      sendBtn.innerHTML = originalText;
-      sendBtn.classList.remove('btn-loading');
-      sendBtn.disabled = false;
       // Ask the user whether to proceed without the file. If user cancels, abort the share.
       const proceed = confirm('File upload failed: ' + (err && err.message ? err.message : String(err)) + '\n\nDo you want to share the message without the file? Click OK to continue, Cancel to abort.');
       if(!proceed){
         if(fileNameEl) fileNameEl.textContent = 'No file chosen';
         return; // abort sharing
       }
-      // Re-enable loading state if user wants to continue
-      sendBtn.innerHTML = '<span class="loading-spinner"></span>';
-      sendBtn.classList.add('btn-loading');
-      sendBtn.disabled = true;
       uploadedUrl = null;
       uploadFailed = true;
     }
@@ -2081,11 +2124,6 @@ document.getElementById('shareSend').addEventListener('click', async ()=> {
   };
   shares.push(shareObj);
   localStorage.setItem('mh_shared_experiences', JSON.stringify(shares));
-  
-  // Reset button state
-  sendBtn.innerHTML = originalText;
-  sendBtn.classList.remove('btn-loading');
-  sendBtn.disabled = false;
 
   // If Firebase is enabled, persist share to Firestore and optionally post into chats for realtime visibility
   try{
