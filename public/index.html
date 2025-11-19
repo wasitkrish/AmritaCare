@@ -729,7 +729,7 @@ textarea.form-input { resize: none; }
 <section class="py-6 reveal">
   <div class="max-w-6xl mx-auto px-4">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-2xl sm:text-3xl font-semibold text-indigo-700 dark:text-indigo-300">Featured Experiences / Messages</h2>
+      <h2 class="text-2xl sm:text-3xl font-semibold text-indigo-700 dark:text-indigo-300">Featured Messages</h2>
     </div>
 
     <div class="relative gallery-viewport card" id="galleryViewport">
@@ -784,10 +784,6 @@ textarea.form-input { resize: none; }
       </div>
 
       <button id="nextVideo" class="side-arrow right" aria-label="Next">›</button>
-
-      <div class="indicators">
-        <div id="videoCounter" class="video-counter">1 / 14</div>
-      </div>
     </div>
 
     <!-- ADMIN modal (outside gallery) -->
@@ -965,7 +961,7 @@ textarea.form-input { resize: none; }
           <div class="review-card">
             <div class="flex items-start justify-between mb-3">
               <div>
-                <div class="font-semibold text-base">Aarav S.</div>
+                <div class="font-semibold text-base">Piyush Jha</div>
                 <div class="text-xs muted mt-1">Student</div>
               </div>
               <div class="text-2xl opacity-20">"</div>
@@ -975,8 +971,8 @@ textarea.form-input { resize: none; }
           <div class="review-card">
             <div class="flex items-start justify-between mb-3">
               <div>
-                <div class="font-semibold text-base">Nisha K.</div>
-                <div class="text-xs muted mt-1">Counsellor</div>
+                <div class="font-semibold text-base">Mukund Sah</div>
+                <div class="text-xs muted mt-1">Student</div>
               </div>
               <div class="text-2xl opacity-20">"</div>
             </div>
@@ -985,8 +981,8 @@ textarea.form-input { resize: none; }
           <div class="review-card">
             <div class="flex items-start justify-between mb-3">
               <div>
-                <div class="font-semibold text-base">Ritika P.</div>
-                <div class="text-xs muted mt-1">Volunteer</div>
+                <div class="font-semibold text-base">Roshan Sah</div>
+                <div class="text-xs muted mt-1">Student</div>
               </div>
               <div class="text-2xl opacity-20">"</div>
             </div>
@@ -995,8 +991,8 @@ textarea.form-input { resize: none; }
           <div class="review-card">
             <div class="flex items-start justify-between mb-3">
               <div>
-                <div class="font-semibold text-base">Rohan T.</div>
-                <div class="text-xs muted mt-1">Learner</div>
+                <div class="font-semibold text-base">Shan Divyesh</div>
+                <div class="text-xs muted mt-1">Student</div>
               </div>
               <div class="text-2xl opacity-20">"</div>
             </div>
@@ -1005,8 +1001,8 @@ textarea.form-input { resize: none; }
           <div class="review-card">
             <div class="flex items-start justify-between mb-3">
               <div>
-                <div class="font-semibold text-base">Meera D.</div>
-                <div class="text-xs muted mt-1">Member</div>
+                <div class="font-semibold text-base">Manik srivastav</div>
+                <div class="text-xs muted mt-1">Student</div>
               </div>
               <div class="text-2xl opacity-20">"</div>
             </div>
@@ -1402,7 +1398,8 @@ sendOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
     return;
   }
   
-  if(!validateInstitutionalEmail(email)){
+  // Strict email validation - must end with @bl.students.amrita.edu
+  if(!email.endsWith('@bl.students.amrita.edu')){
     alert('❌ Please use your institutional email ending with @bl.students.amrita.edu');
     return;
   }
@@ -1723,7 +1720,6 @@ window.addEventListener('load', ()=>{
   track.appendChild(firstClone);
 
   let idx = 0, anim=false;
-  const videoCounter = document.getElementById('videoCounter');
   const fade = document.getElementById('galleryFade');
   const viewport = document.getElementById('galleryViewport');
 
@@ -1766,7 +1762,6 @@ window.addEventListener('load', ()=>{
 
   function slideWidth(){ return track.parentElement.getBoundingClientRect().width; }
   function setPos(i){ const w=slideWidth(); track.style.transition='none'; track.style.transform = `translateX(-${(i+1)*w}px)`; }
-  function updateCounter(){ if(videoCounter) videoCounter.textContent = `${idx + 1} / ${N}`; }
 
   // play visible — for iframe embeds, do nothing; for <video>, try to play
   function playVisible(){
@@ -1843,7 +1838,6 @@ window.addEventListener('load', ()=>{
         target = 0; 
       }
       idx = (target + N) % N;
-      updateCounter();
       updateContainerSize();
       fade.classList.remove('active');
       
@@ -1933,7 +1927,6 @@ window.addEventListener('load', ()=>{
       setPos(0); 
       bindOverlays(); 
       bindEnded(); 
-      updateCounter(); 
       updateContainerSize(); 
       if(viewport) viewport.style.visibility = 'visible';
     }, 120);
