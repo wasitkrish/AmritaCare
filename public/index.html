@@ -1361,6 +1361,15 @@ const verifyOtpBtn = document.getElementById('verifyOtpBtn');
 const resendOtpBtn = document.getElementById('resendOtpBtn');
 
 let pendingSignup = null;
+let signupProcessing = false; // prevent duplicate requests
+
+function validateSignupInputs(name, email, pwd){
+  const emailPattern = /^[a-z0-9._%+-]+@bl\.students\.amrita\.edu$/i;
+  if(!name || name.trim().length < 2) return { valid:false, message:'Name must be at least 2 characters' };
+  if(!emailPattern.test(email)) return { valid:false, message:'Invalid institutional email (use @bl.students.amrita.edu)' };
+  if(!pwd || pwd.length < 6) return { valid:false, message:'Password must be at least 6 characters' };
+  return { valid:true };
+}
 
 function openAuth(mode='login'){
   authOverlay.classList.remove('hidden');
@@ -1415,27 +1424,15 @@ loginForm.addEventListener('submit', e=>{ if(window._useFirebaseAuth) return;
 });
 
 /* SIGNUP SEND OTP */
-sendOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
+sendOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return; // handled by Firebase block
+  if(signupProcessing) return; // guard
   const name = document.getElementById('signupName').value.trim();
   const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const pwd = document.getElementById('signupPassword').value;
   const errEl = document.getElementById('signupError');
   if(errEl) errEl.textContent = '';
-
-  if(!name || name.length < 2){
-    if(errEl){ errEl.textContent = 'Please enter a valid name (min 2 chars)'; } else { alert('❌ Please enter a valid name (at least 2 characters)'); }
-    return;
-  }
-  // Strict institutional email format
-  const emailPattern = /^[a-z0-9._%+-]+@bl\.students\.amrita\.edu$/i;
-  if(!emailPattern.test(email)){
-    if(errEl){ errEl.textContent = 'Invalid institutional email. Use @bl.students.amrita.edu'; } else { alert('❌ Please use your institutional email ending with @bl.students.amrita.edu'); }
-    return;
-  }
-  if(!pwd || pwd.length < 6){
-    if(errEl){ errEl.textContent = 'Password must be at least 6 characters'; } else { alert('❌ Password must be at least 6 characters long'); }
-    return;
-  }
+  const v = validateSignupInputs(name, email, pwd);
+  if(!v.valid){ if(errEl){ errEl.textContent = v.message; } else { alert('❌ '+v.message); } return; }
   const accs = loadAccounts();
   if(accs.some(a=>a.email===email)){
     if(errEl){ errEl.textContent = 'Account already exists. Please login.'; } else { alert('❌ Account already exists. Please login instead.'); }
@@ -1443,12 +1440,14 @@ sendOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
     return;
   }
   // Generate and store OTP only after passing validation
+  signupProcessing = true;
   const otp = generateOTP();
   storeOTP(email, otp);
   pendingSignup = { name, email, password: pwd };
   otpTarget.innerText = email;
   openAuth('otp');
   alert(`📨 OTP sent to ${email}\n\nSimulated OTP: ${otp}\n(In production, this would be sent via email)`);
+  signupProcessing = false;
 });
 
 verifyOtpBtn.addEventListener('click', ()=>{ if(window._useFirebaseAuth) return;
@@ -3475,15 +3474,10 @@ if(document.readyState === 'loading') {
             const name = document.getElementById('signupName').value.trim();
             const email = document.getElementById('signupEmail').value.trim().toLowerCase();
             const pwd = document.getElementById('signupPassword').value;
-            if(!name || !email || !pwd){ alert('Fill all fields'); return; }
-            // Institutional email validation (Firebase path)
             const errEl = document.getElementById('signupError');
             if(errEl) errEl.textContent='';
-            const emailPattern = /^[a-z0-9._%+-]+@bl\.students\.amrita\.edu$/i;
-            if(!emailPattern.test(email)){
-              if(errEl){ errEl.textContent = 'Invalid institutional email. Use @bl.students.amrita.edu'; } else { alert('Invalid institutional email'); }
-              return;
-            }
+            const v = validateSignupInputs(name, email, pwd);
+            if(!v.valid){ if(errEl){ errEl.textContent = v.message; } else { alert(v.message); } return; }
             try{
               const r = await fetch('/api/send-otp', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ name, email }) });
               const j = await r.json();
