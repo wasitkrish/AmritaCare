@@ -3,7 +3,7 @@
 
 A modern web platform dedicated to raising awareness about student mental health, featuring inspirational videos and an interactive chat experience.
 
-🌐 **Live Demo:** [NepTour Live](https://amritacare.vercel.app/)
+🌐 **Live Demo:** [AmritaCare Live](https://amritacare.vercel.app/)
 
 ---
 
