@@ -1,4 +1,3 @@
-
 # 🧠 Mental Health Awareness for Students
 
 A modern web platform dedicated to raising awareness about student mental health, featuring inspirational videos and an interactive chat experience.
