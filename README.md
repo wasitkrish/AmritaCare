@@ -112,7 +112,7 @@ http://localhost:3000
 ├── package.json           # Dependencies
 ├── .env.example           # Environment variables template
 ├── .gitignore             # Git ignore rules
-└── README.md              # This file
+└── README.md              # This file.
 ```
 
 ---
