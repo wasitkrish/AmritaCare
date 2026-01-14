@@ -1,3 +1,21 @@
+<!-- Banner Header -->
+
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:6a11cb,100:2575fc&height=220&section=header&text=Mental%20Health%20Awareness%20for%20Students&fontSize=36&fontColor=ffffff&animation=fadeIn" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Frontend-JavaScript-yellow.svg?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Backend-Node.js-green.svg?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge" />
+</p>
+
+<p align="center">
+  <b>Web platform promoting mental health awareness for students with AI chat & video content</b>
+</p>
+
+---
+
 # 🧠 Mental Health Awareness for Students
 
 A modern web platform dedicated to raising awareness about student mental health, featuring inspirational videos and an interactive chat experience.
@@ -8,24 +26,24 @@ A modern web platform dedicated to raising awareness about student mental health
 
 ## 🛠️ Features
 
-- 🎥 Video gallery with curated mental health content  
-- 💬 AI-powered chat assistance (via OpenAI GPT)  
-- 🔐 Firebase Authentication  
-- ☁️ Cloudinary integration for file uploads  
-- 📧 FormSubmit.io for contact form submissions  
-- 🎨 Beautiful, responsive UI with Tailwind CSS  
-- 🌙 Dark mode support  
+* 🎥 Video gallery with curated mental health content
+* 💬 AI-powered chat assistance (via OpenAI GPT)
+* 🔐 Firebase Authentication
+* ☁️ Cloudinary integration for file uploads
+* 📧 FormSubmit.io for contact form submissions
+* 🎨 Beautiful, responsive UI with Tailwind CSS
+* 🌙 Dark mode support
 
 ---
 
 ## 📌 Tech Stack
 
-- **Frontend:** HTML5, CSS3, JavaScript (Vanilla)  
-- **Styling:** Tailwind CSS  
-- **Authentication:** Firebase  
-- **File Upload:** Cloudinary  
-- **Backend:** Node.js + Express  
-- **Contact Form:** FormSubmit.io  
+* **Frontend:** HTML5, CSS3, JavaScript (Vanilla)
+* **Styling:** Tailwind CSS
+* **Authentication:** Firebase
+* **File Upload:** Cloudinary
+* **Backend:** Node.js + Express
+* **Contact Form:** FormSubmit.io
 
 ---
 
@@ -33,10 +51,10 @@ A modern web platform dedicated to raising awareness about student mental health
 
 ### Prerequisites
 
-- Node.js (>= 16)  
-- npm or yarn  
-- Firebase project credentials  
-- Cloudinary account  
+* Node.js (>= 16)
+* npm or yarn
+* Firebase project credentials
+* Cloudinary account
 
 ### Installation
 
@@ -45,7 +63,7 @@ A modern web platform dedicated to raising awareness about student mental health
 ```bash
 git clone <repository-url>
 cd mental-health-students-site
-````
+```
 
 2. Install dependencies:
 
@@ -142,5 +160,13 @@ For questions or support, reach out via the contact form on the website or email
 
 ---
 
+## 📜 License
+
+This project is licensed under the **MIT License**.
+
+Copyright (c) 2026  
+**Krish Singh** ([github.com/wasitkrish](https://github.com/wasitkrish))
+
+---
 **⚠️ Note:** This is a mental health awareness platform.
 If you or someone you know is struggling with mental health, please reach out to a professional or contact a mental health helpline.
